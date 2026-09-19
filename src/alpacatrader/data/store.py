@@ -37,7 +37,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from alpacatrader.data.candles import EXCHANGE, bars
+from alpacatrader.data.candles import EXCHANGE, OPEN, bars
 
 STORE = Path(__file__).parents[3] / "data"
 START = "2016-01-04"  # the floor of Alpaca's history; a younger symbol simply starts later
@@ -217,8 +217,17 @@ def load(symbol: str, interval: str = BASE) -> pd.DataFrame:
     """The stored minutes, resampled to `interval` **inside the session and never across one**.
 
     A bucket that spans a close would mix the last minutes of one day with the first of the next and
-    invent a bar that never traded. Grouping by exchange-local date before resampling is what stops
-    it, and it is the same rule `dispersion` takes for returns.
+    invent a bar that never traded.
+
+    Grouping by exchange-local date before resampling is the obvious way to stop that, and it is
+    what this did — 2,693 groups per symbol, 54,000 resample calls for the basket, minutes of wall
+    clock for an operation that is seconds. It is also unnecessary here, for a reason worth checking
+    rather than assuming: the session opens at 14:30 or 13:30 UTC, which are 870 and 810 minutes
+    from midnight, and both divide by 3, 5 and 15. A global resample therefore lays its buckets on
+    the session's own boundaries, and the 17.5-hour gap between sessions is hundreds of empty
+    buckets that `dropna` removes. `_aligned` asserts the divisibility instead of trusting it, so an
+    interval that does not divide — a seven-minute bar — raises here rather than quietly mixing two
+    days at every open.
     """
     stamp = read_stamp(symbol)
     if stamp is None:
@@ -229,10 +238,32 @@ def load(symbol: str, interval: str = BASE) -> pd.DataFrame:
     if interval == BASE:
         return frame
     rule = interval.replace("m", "min").replace("hh", "h")
+    _aligned(frame.index, rule)
     how = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
     how = {k: v for k, v in how.items() if k in frame.columns}
-    day = frame.index.tz_convert(EXCHANGE).date
-    return pd.concat([g.resample(rule).agg(how).dropna(how="all") for _, g in frame.groupby(day)])
+    # Dropped on `close` and never with `how="all"`: `sum` over an empty bucket is 0.0, not NaN, so
+    # the volume column alone keeps every overnight and weekend bucket alive. That mistake turns
+    # 350k session bars into 1.9M — one bucket for every three minutes of the decade, most of them
+    # hours when the market was shut. `last` over nothing is NaN, which is the honest marker.
+    return frame.resample(rule).agg(how).dropna(subset=["close"])
+
+
+def _aligned(index: pd.DatetimeIndex, rule: str) -> None:
+    """Refuse an interval whose buckets would not start where sessions do — see `load`.
+
+    Measured against the **canonical** 09:30 open and not against the first bar each symbol
+    happens to have. A thin name that did not print at the bell opens its session at 13:31 UTC,
+    which is not a fact about the exchange and would fail this check for the wrong reason — it did,
+    on the first run of the basket.
+    """
+    minutes = int(pd.Timedelta(rule).total_seconds() // 60)
+    local = index.tz_convert(EXCHANGE)
+    days = pd.DatetimeIndex(local.normalize().unique())
+    opens = (days + pd.Timedelta(hours=OPEN.hour, minutes=OPEN.minute)).tz_convert("UTC")
+    offsets = sorted(set((opens.hour * 60 + opens.minute).tolist()))
+    bad = [o for o in offsets if o % minutes]
+    if bad:
+        raise ValueError(f"{rule} buckets do not start at the open ({bad} minutes from midnight UTC)")
 
 
 def _selfcheck() -> None:
@@ -277,6 +308,27 @@ def _selfcheck() -> None:
 
     stamp = stamp_of(frame, "2026-03-10", "2026-03-12")
     assert stamp["rows"] == n and stamp["feed"] == "sip" and stamp["adjustment"] == "split"
+
+    # The alignment `load` relies on to skip the per-session loop: 3, 5 and 15 divide both session
+    # offsets, 7 divides neither, and the difference has to raise rather than silently mix two days.
+    # An empty bucket has no close, and that is what says it is not a bar. Volume would say 0.0.
+    sparse = pd.DataFrame({"close": [1.0, 2.0], "volume": [10.0, 20.0]}, index=grid[[0, 100]])
+    rolled = sparse.resample("5min").agg({"close": "last", "volume": "sum"})
+    assert len(rolled) > 2 and (rolled.volume == 0).any(), "empty buckets exist and carry zero volume"
+    assert len(rolled.dropna(subset=["close"])) == 2, "and only the two real bars survive"
+    assert len(rolled.dropna(how="all")) > 2, "which `how=all` would not have caught"
+
+    for good in ("3min", "5min", "15min"):
+        _aligned(grid, good)
+    # A symbol that missed the opening bell still aligns: the check reads the exchange's open, not
+    # the first row present. This is the case that failed on the first real run.
+    _aligned(grid[1:], "3min")
+    try:
+        _aligned(grid, "7min")
+    except ValueError as error:
+        assert "7min" in str(error)
+    else:
+        raise AssertionError("a seven-minute bucket would span the open and must be refused")
 
 
 if __name__ == "__main__":

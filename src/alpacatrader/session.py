@@ -20,6 +20,8 @@ change.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
@@ -73,8 +75,21 @@ STEPS = 15
 EXTREMA = 15
 
 
+@lru_cache(maxsize=4)
+def _half_days(names: tuple[str, ...]) -> pd.DatetimeIndex:
+    from alpacatrader.data.store import path, read_stamp
+
+    per = [sessions(pd.read_parquet(path(s)).index) for s in names if read_stamp(s)]
+    days = consensus(per)
+    return pd.DatetimeIndex(days.index[days.half_day])
+
+
 def half_days(symbols: list[str] | None = None) -> pd.DatetimeIndex:
-    """The dates the exchange closed at 13:00, by majority across the basket (see `calendar`)."""
+    """The dates the exchange closed at 13:00, by majority across the basket (see `calendar`).
+
+    Cached on the symbol tuple: it reads every Parquet in the basket to take the majority, and a
+    caller building a panel asks for it once per symbol unless something remembers the answer.
+    """
     from alpacatrader.data.store import path, read_stamp
     from alpacatrader.universe import U1
 
