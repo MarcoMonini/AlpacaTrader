@@ -41,8 +41,11 @@ HORIZONS = (5, 15, 30)  # bars of 3m: a third of a leg, a leg, two legs
 FOLDS = 4
 
 
+FIELDS = ("open", "high", "low", "close", "volume")
+
+
 def build(symbols: list[str] | None = None) -> dict:
-    """Closes, session, bar and the usable mask, on one grid shared by every symbol.
+    """OHLCV as wide frames, plus session, bar and the usable mask, on one grid every symbol shares.
 
     Aligned on the timestamp and then renumbered: a symbol missing a bucket leaves a NaN in a row
     rather than shifting its own bar count, which is what would happen if each symbol carried its
@@ -52,14 +55,15 @@ def build(symbols: list[str] | None = None) -> dict:
     # The half-day calendar is read once and handed to every symbol. `frame` would otherwise
     # rebuild it per call, and that means re-reading all twenty Parquet files twenty times.
     early = half_days(names)
-    closes = {symbol: frame(symbol, early=early).set_index("timestamp").close for symbol in names}
-    close = pd.DataFrame(closes).sort_index()
+    each = {symbol: frame(symbol, early=early).set_index("timestamp") for symbol in names}
+    wide = {f: pd.DataFrame({s: b[f] for s, b in each.items()}).sort_index() for f in FIELDS}
+    close = wide["close"]
     day = pd.Series(close.index.tz_convert("America/New_York").date, index=close.index)
     session = pd.Series(day.factorize()[0], index=close.index)
     bar = session.groupby(session).cumcount()
     size = session.map(session.value_counts())
     keep = (bar >= max(2 * STEPS, EXTREMA)) & (bar < size - EXTREMA)
-    return {"close": close, "session": session, "bar": bar, "size": size, "usable": keep}
+    return {**wide, "session": session, "bar": bar, "size": size, "usable": keep}
 
 
 def forward(p: dict, horizon: int) -> pd.DataFrame:
