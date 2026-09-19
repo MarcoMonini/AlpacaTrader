@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swing intraday su equity — specifica e decisioni</title>
+<style>
+:root{
+  --bg:#fbfaf8; --panel:#fff; --ink:#1a1c1f; --soft:#5c6169; --line:#e3e1dc;
+  --accent:#1b6b4a; --amber:#8a6212; --blue:#1f5c8c; --red:#a33a2a;
+  --chip:#f1efea; --code:#f4f2ee;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15161a; --panel:#1c1e23; --ink:#e8e6e3; --soft:#9aa0a8; --line:#2c2f36;
+  --accent:#5cc394; --amber:#d9a441; --blue:#6aa9d9; --red:#e08b7a;
+  --chip:#24272d; --code:#22252b;
+}}
+:root[data-theme="dark"]{
+  --bg:#15161a; --panel:#1c1e23; --ink:#e8e6e3; --soft:#9aa0a8; --line:#2c2f36;
+  --accent:#5cc394; --amber:#d9a441; --blue:#6aa9d9; --red:#e08b7a;
+  --chip:#24272d; --code:#22252b;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.62;margin:0}
+.wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+
+header{border-bottom:2px solid var(--ink);padding-bottom:24px;margin-bottom:8px}
+h1{font-size:30px;line-height:1.2;margin:0 0 8px;letter-spacing:-.02em}
+.tagline{color:var(--soft);font-size:16px;margin:0 0 20px;max-width:70ch}
+.facts{display:flex;flex-wrap:wrap;gap:10px}
+.fact{background:var(--chip);border-radius:6px;padding:8px 12px;font-size:13px}
+.fact b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+.fact span{color:var(--soft)}
+
+section{margin-top:56px;scroll-margin-top:16px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--soft);
+   margin:0 0 4px;font-weight:600}
+h2 .n{color:var(--ink);font-variant-numeric:tabular-nums}
+.h2sub{font-size:23px;font-weight:650;letter-spacing:-.01em;margin:0 0 20px;
+       padding-bottom:12px;border-bottom:1px solid var(--line)}
+h3{font-size:17px;margin:32px 0 10px;font-weight:640;letter-spacing:-.01em}
+h3:first-of-type{margin-top:24px}
+p{margin:0 0 12px;max-width:78ch}
+.lead{font-size:16px;color:var(--soft);max-width:74ch}
+
+.b{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;
+   text-transform:uppercase;padding:2px 8px;border-radius:99px;vertical-align:3px;margin-left:8px}
+.b-ok{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.b-msr{background:color-mix(in srgb,var(--blue) 15%,transparent);color:var(--blue)}
+.b-open{background:color-mix(in srgb,var(--amber) 18%,transparent);color:var(--amber)}
+.b-no{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
+
+.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+     padding:18px 20px;margin:18px 0}
+.box>:last-child{margin-bottom:0}
+.box.why{border-left:3px solid var(--blue)}
+.box.no{border-left:3px solid var(--red)}
+.box.open{border-left:3px solid var(--amber)}
+.box.ok{border-left:3px solid var(--accent)}
+.box h4{margin:0 0 8px;font-size:15px;font-weight:640}
+
+.tw{overflow-x:auto;margin:18px 0;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+caption{text-align:left;padding:12px 16px;color:var(--soft);font-size:12.5px;border-bottom:1px solid var(--line)}
+th{text-align:left;font-weight:600;color:var(--soft);font-size:12px;text-transform:uppercase;
+   letter-spacing:.05em;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.key{font-family:var(--mono);font-size:12.5px}
+tr.total td{font-weight:650;background:var(--chip)}
+tr.hi td{background:color-mix(in srgb,var(--accent) 8%,transparent);font-weight:600}
+tr.lo td{background:color-mix(in srgb,var(--red) 7%,transparent)}
+td.foot{color:var(--soft);font-size:12.5px;background:var(--chip)}
+.pos{color:var(--accent)}.neg{color:var(--red)}
+
+code{font-family:var(--mono);font-size:.88em;background:var(--code);padding:1.5px 5px;border-radius:4px}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code);padding:14px 16px;
+    border-radius:8px;overflow-x:auto;margin:12px 0;line-height:1.5}
+ul,ol{margin:0 0 12px;padding-left:20px;max-width:78ch}li{margin-bottom:6px}
+strong{font-weight:650}
+footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:var(--soft);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Swing intraday su equity — specifica e decisioni</h1>
+  <p class="tagline">Lo stesso impianto — pivot centrati, etichetta di gamba, GRU multi-ramo, purging esatto, ottimizzazione di policy con la commissione dentro la ricompensa — spostato da venti coppie crypto a un paniere di ETF e azioni USA su Alpaca, dove la commissione è zero e il costo di esecuzione scende di un fattore fra 15 e 150. Questo documento eredita ogni decisione del progetto crypto e la marca: riusabile, da rimisurare, o decaduta. Nessun numero di P&amp;L qui è stato preso su equity — quelli crypto sono citati solo per dire quale soglia di costo il progetto ha già dimostrato di non riuscire a superare.</p>
+  <div class="facts">
+    <div class="fact"><b>0.17–1.34</b><span>bp per lato, per simbolo</span></div>
+    <div class="fact"><b>25.00</b><span>bp per lato, venue precedente</span></div>
+    <div class="fact"><b>1.76</b><span>bp, miglior break-even mai misurato</span></div>
+    <div class="fact"><b>2016</b><span>storico SIP, gratuito</span></div>
+    <div class="fact"><b>20</b><span>simboli, cardinalità invariata</span></div>
+    <div class="fact"><b>0</b><span>misure di P&amp;L su equity</span></div>
+  </div>
+</header>
+
+<!-- ============================================================ 1 -->
+<section>
+  <h2><span class="n">1</span> · Eredità</h2>
+  <p class="h2sub">Cosa si porta dietro, e cosa muore qui</p>
+  <p class="lead">Il progetto crypto ha prodotto quattro anni di decisioni misurate. La maggior parte è logica sul <em>problema</em> e sopravvive al cambio di venue; una minoranza è aritmetica sul <em>mercato</em> e non sopravvive. Distinguere le due è l'unico lavoro di questa sezione, ed è il motivo per cui il documento esiste prima del codice.</p>
+
+  <div class="box ok">
+    <h4>Il vocabolario, quattro parole, usato in tutto il documento</h4>
+    <ul>
+      <li><span class="b b-ok">riusabile</span> la decisione vale identica. Si riusa il codice e si riusa il ragionamento.</li>
+      <li><span class="b b-msr">da rimisurare</span> il ragionamento vale, il numero no. Il codice si riusa, la costante va ripresa sui dati nuovi.</li>
+      <li><span class="b b-no">decaduto</span> non è più corretto su questo venue. Il codice va cambiato o cancellato.</li>
+      <li><span class="b b-open">aperto</span> decisione nuova, che il progetto crypto non ha mai dovuto prendere.</li>
+    </ul>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>l'inventario completo — ogni decisione chiusa del documento precedente, marcata</caption>
+      <thead><tr><th>decisione</th><th>in codice</th><th>esito</th><th>perché</th></tr></thead>
+      <tbody>
+        <tr><td>Purging esatto su <code>next_pivot</code>, non embargo fisso</td><td class="key">split.temporal</td><td><span class="b b-ok">riusabile</span></td><td>la distanza al pivot successivo resta illimitata qualunque sia l'asset</td></tr>
+        <tr><td>Walk-forward a quattro fold, non split unico</td><td class="key">split.walk_forward</td><td><span class="b b-ok">riusabile</span></td><td>un confronto senza dispersione fra fold non è un confronto</td></tr>
+        <tr><td>Niente split per simbolo</td><td class="key">split</td><td><span class="b b-ok">riusabile</span></td><td>gli ETF settoriali sono <em>più</em> correlati di venti altcoin, non meno</td></tr>
+        <tr><td>Pivot su Close, finestra centrata</td><td class="key">data.pivots</td><td><span class="b b-ok">riusabile</span></td><td>le quattro ragioni tengono; su equity si aggiunge l'asta di apertura, che stampa estremi non negoziabili su High/Low</td></tr>
+        <tr><td>Il pivot ha un gemello causale</td><td class="key">legs.confirmed</td><td><span class="b b-ok">riusabile</span></td><td>non si approssima mai un pivot centrato con uno shift</td></tr>
+        <tr><td>Robust scaling con clip, statistiche solo su train</td><td class="key">normalize</td><td><span class="b b-msr">da rimisurare</span></td><td><code>CLIP</code>/<code>SCALE</code> sono tarati sugli IQR delle colonne crypto</td></tr>
+        <tr><td>Rank cross-sezionale dentro la data</td><td class="key">normalize.cross_rank</td><td><span class="b b-ok">riusabile</span></td><td>valeva +82% di Rank IC; il ragionamento è sul label, non sull'asset</td></tr>
+        <tr><td>Set di segnale qlib, IC / ICIR / Rank IC / Rank ICIR</td><td class="key">metrics.signal</td><td><span class="b b-ok">riusabile</span></td><td>venti simboli qui come lì, errore standard per cross-section identico a 0,24</td></tr>
+        <tr><td>L'ICIR grezzo non è una significatività</td><td class="key">metrics.blocked</td><td><span class="b b-ok">riusabile</span></td><td>vale per qualunque etichetta con orizzonte sovrapposto</td></tr>
+        <tr><td>Spearman senza scipy</td><td class="key">metrics.spearman</td><td><span class="b b-ok">riusabile</span></td><td>la pagina deve continuare a stare in piedi senza scipy</td></tr>
+        <tr><td>Lo stamp della cache rifiuta parametri diversi</td><td class="key">dataset.cached</td><td><span class="b b-ok">riusabile</span></td><td>è la cosa che ha salvato metà sessione l'ultima volta</td></tr>
+        <tr><td>torch e lightgbm mai nello stesso processo</td><td class="key">tests/test_selfchecks</td><td><span class="b b-ok">riusabile</span></td><td>è un vincolo di OpenMP, non di mercato</td></tr>
+        <tr><td>Il modello si addestra due volte, P&amp;L nello stadio 2</td><td class="key">swing.fit_policy</td><td><span class="b b-ok">riusabile</span></td><td>qui conta <em>di più</em>: la commissione per simbolo va dentro la ricompensa</td></tr>
+        <tr><td>La ricompensa è pagata su rendimenti detrendizzati</td><td class="key">swing.fit_policy</td><td><span class="b b-ok">riusabile</span></td><td>su un paniere che sale, senza detrend la policy ottima è buy and hold, e la trova</td></tr>
+        <tr><td>Controllo a esposizione fissa, non buy-and-hold</td><td class="key">swingrule.rotation_null</td><td><span class="b b-ok">riusabile</span></td><td>diventa obbligatorio dal primo giorno, non aggiunto alla fine</td></tr>
+        <tr><td>Il giudice è il prezzo, non l'etichetta</td><td class="key">legcheck</td><td><span class="b b-ok">riusabile</span></td><td>è la lezione più costosa del progetto precedente</td></tr>
+        <tr><td><code>finestra_estremi = 24</code></td><td class="key">data.pivots</td><td><span class="b b-msr">da rimisurare</span></td><td>misurata su P&amp;L d'oracolo con penalità di ritardo su candele 15m crypto</td></tr>
+        <tr><td>δ della Huber = 2.1</td><td class="key">gru</td><td><span class="b b-msr">da rimisurare</span></td><td>è la mediana di <code>|target|</code> in unità dell'etichetta</td></tr>
+        <tr><td>N in barre e non in ore, 24 step per ramo</td><td class="key">features</td><td><span class="b b-msr">da rimisurare</span></td><td>la regola tiene, il ramo più lento ora deve stare dentro la sessione (§7)</td></tr>
+        <tr><td>Le 29 colonne candidate</td><td class="key">features</td><td><span class="b b-msr">da rimisurare</span></td><td>tutte causali e scale-free, quindi tutte applicabili; le sei di volume cambiano significato (§6)</td></tr>
+        <tr><td>Selezione 28 → 12</td><td class="key">selection</td><td><span class="b b-no">decaduto</span></td><td>era già dichiarata non trasferibile fra etichette; a maggior ragione fra asset class</td></tr>
+        <tr><td>Griglia 5m continua, ramo a <code>label + tf − 5m</code>, ffill</td><td class="key">dataset.build</td><td><span class="b b-no">decaduto</span></td><td>assume tempo continuo. È il refactor principale del progetto (§7)</td></tr>
+        <tr><td>Campionamento sull'orologio <code>index.floor(step) == index</code></td><td class="key">dataset.build</td><td><span class="b b-no">decaduto</span></td><td>produce timestamp fuori sessione, dove non esiste una barra</td></tr>
+        <tr><td><code>FEE = 0.0025</code>, scalare</td><td class="key">oracle</td><td><span class="b b-no">decaduto</span></td><td>su equity il costo varia di un fattore 8 fra simboli dello stesso paniere (§2)</td></tr>
+        <tr><td>«Perché non lo storico di Alpaca»</td><td class="key">data.binance</td><td><span class="b b-no">decaduto</span></td><td>era una critica all'endpoint <em>crypto</em> di Alpaca. Su equity lo storico è SIP, dal 2016, completo e gratuito (§3)</td></tr>
+        <tr><td>Ogni numero di P&amp;L del documento precedente</td><td class="key">—</td><td><span class="b b-no">decaduto</span></td><td>preso su un paniere sceso del 49–81% l'anno. Il segno del bias di esposizione si inverte qui (§11)</td></tr>
+        <tr><td>Azioni societarie</td><td class="key">—</td><td><span class="b b-open">aperto</span></td><td>split e dividendi non esistono su una coppia USDT (§3)</td></tr>
+        <tr><td>Stagionalità intraday</td><td class="key">—</td><td><span class="b b-open">aperto</span></td><td>il volume crypto non ha una U giornaliera, quello equity sì (§6)</td></tr>
+        <tr><td>Intraday-only o multi-day</td><td class="key">—</td><td><span class="b b-open">aperto</span></td><td>il gap notturno è la decisione che struttura tutto il resto (§5)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box why">
+    <h4>Il numero che giustifica il progetto <span class="b b-msr">verificato alla fonte</span></h4>
+    <p>Il progetto crypto non ha mai trovato un segnale che coprisse il costo di esecuzione. Non è un fallimento di modello: è un rapporto. Il break-even migliore mai misurato su qualunque strada — composito di esaurimento riequilibrato ogni tre giorni — chiede <strong>1,76 bp per lato</strong>. Il taker Alpaca su crypto è <strong>25 bp</strong>. Mancava un fattore 14, e in altri punti della griglia mancava un fattore 170.</p>
+    <p>Su equity USA la commissione è <strong>zero</strong> e il costo residuo è, per un ETF liquido ad alto prezzo, <strong>0,17 bp per lato</strong>. Lo stesso segnale, con lo stesso lordo, passerebbe da <em>impossibile</em> a <em>dieci volte sopra il break-even</em>. Il progetto non cambia idea sul modello: cambia il posto in cui lo paga.</p>
+  </div>
+
+  <div class="box no">
+    <h4>E il numero che lo minaccia <span class="b b-msr">misurato, sul venue vecchio</span></h4>
+    <p>Il lordo di quelle misure non era abilità. <code>threshold --by-symbol</code> su venti coppie: Spearman <strong>−0,734</strong> fra il lordo della gamba short e il buy-and-hold del simbolo. Le quattro coppie in utile su venti erano le quattro scese di più (AVAX −84%, SUSHI −89%, XTZ −78%), la gamba long perdeva a <em>ogni</em> soglia della griglia, e il paniere scendeva del 49% l'anno. Era esposizione, non selezione.</p>
+    <p><strong>L'equity USA sale.</strong> Lo stesso libro, con lo stesso bias, ha il vento contro invece che a favore. Nessuna riduzione di commissione sistema questo, e nessun numero lordo del documento precedente si trasporta. Quello che si trasporta è solo l'affermazione sul <em>costo</em>: il denominatore migliora di due ordini di grandezza, il numeratore va rimisurato da zero.</p>
+    <p>Conseguenza di protocollo, non di opinione: <code>rotation_null</code> — o un controllo a esposizione fissa equivalente — è la prima riga di ogni tabella di P&amp;L di questo progetto, non l'ultima. Il documento precedente lo ha aggiunto dopo aver creduto a un win rate di 0,545 su 1577 trade.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section>
+  <h2><span class="n">2</span> · Venue e costi</h2>
+  <p class="h2sub">Alpaca, equity e ETF USA <span class="b b-msr">verificato alle fonti primarie</span></p>
+  <p class="lead">Questa sezione è nuova e viene prima di tutte le altre, perché il costo è l'unica ragione per cui il progetto si sposta. Ogni numero qui è stato verificato su documento ufficiale — fee schedule, notice FINRA, doc Alpaca — e non su recensioni di terzi.</p>
+
+  <h3>La domanda «quali titoli sono senza commissione» ha una risposta noiosa</h3>
+  <p><strong>Tutti.</strong> Alpaca non ha una lista di titoli idonei: $0 di commissione su ogni azione e ogni ETF quotato USA, senza eccezioni per liquidità, prezzo o settore. La domanda che discrimina davvero non è quale titolo è senza commissione, ma <em>quale titolo è economico</em> — ed è una domanda sullo spread, che dipende dal prezzo per azione e non dal ticker.</p>
+
+  <div class="tw">
+    <table>
+      <caption>tutte le voci di costo, con il lato su cui cadono — fee schedule Alpaca al 2026-09-01, notice FINRA</caption>
+      <thead><tr><th>voce</th><th class="num">tasso</th><th>lato</th><th>nota operativa</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>commissione equity / ETF</td><td class="num">$0</td><td>—</td><td>universale</td></tr>
+        <tr><td>SEC §31</td><td class="num">$20,60 / $1M</td><td>solo vendita</td><td>= 0,206 bp. <strong>Cambia ogni anno</strong> — era $0,00/M fino al 3 apr 2026. Va in config, mai costante</td></tr>
+        <tr><td>FINRA TAF</td><td class="num">$0,000195 / azione</td><td>solo vendita</td><td>cap $9,79. Per <em>azione</em>: colpisce i titoli a basso prezzo, non quelli a basso valore</td></tr>
+        <tr><td>borrow ETB</td><td class="num">$0</td><td>short</td><td>5.000+ titoli; tutti i candidati di §4 ci sono</td></tr>
+        <tr><td>dividendi su short</td><td class="num">= dividendo</td><td>short, ex-date</td><td>1,5–3% l'anno sugli ETF azionari. Voce di costo, non correzione di prezzo</td></tr>
+        <tr><td>dati storici SIP</td><td class="num">$0</td><td>—</td><td>dal 2016, minute bar, purché <code>end</code> ≥ 15 min fa</td></tr>
+        <tr><td>dati real-time SIP</td><td class="num">$99 / mese</td><td>—</td><td>Algo Trader Plus. Serve <strong>solo in live</strong>: l'intero backtest è gratuito</td></tr>
+        <tr><td>opzioni</td><td class="num">$0,65 / contratto</td><td>—</td><td>fuori perimetro</td></tr>
+        <tr><td>crypto Alpaca</td><td class="num">0,25%</td><td>ogni lato</td><td>i 25 bp del progetto precedente, per riferimento</td></tr>
+        <tr><td class="foot" colspan="4">la PDT è stata ritirata da FINRA; Alpaca è su Intraday Margin dal 4 giu 2026 e il minimo per 4x intraday è sceso da $25.000 a $2.000. I campi <code>daytrade_count</code> e <code>daytrading_buying_power</code> escono dall'API il 6 lug 2026</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>La formula del costo, e perché è per simbolo <span class="b b-msr">decisione</span></h3>
+  <p>Con la commissione a zero il costo per lato è dominato dal mezzo spread, che in punti base è inversamente proporzionale al prezzo per azione. Con <code>s</code> lo spread in dollari e <code>P</code> il prezzo:</p>
+  <pre>costo_per_lato(bp) = 0,103  +  0,975/P  +  5000·s/P
+                     SEC/2      TAF/2       mezzo spread</pre>
+  <p>Il primo termine è proporzionale al valore e quindi identico per ogni titolo. Il secondo e il terzo sono per azione e quindi <strong>scalano come 1/P</strong>. Fra SPY a $761 e XLU a $41 ci sono, a parità di spread quotato di un centesimo, <strong>otto volte di costo</strong>. Un <code>FEE</code> scalare non descrive questo paniere.</p>
+
+  <div class="tw">
+    <table>
+      <caption>costo per lato a spread 1 cent — <strong>limite inferiore</strong>, prezzi reali al 2026-09-19, spread da misurare (§4)</caption>
+      <thead><tr><th>simbolo</th><th class="num">prezzo</th><th class="num">SEC/2</th><th class="num">TAF/2</th><th class="num">½ spread</th><th class="num">totale bp</th><th class="num">× su SPY</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td class="key">SPY</td><td class="num">761,69</td><td class="num">0,103</td><td class="num">0,001</td><td class="num">0,066</td><td class="num">0,170</td><td class="num">1,0</td></tr>
+        <tr><td class="key">QQQ</td><td class="num">721,45</td><td class="num">0,103</td><td class="num">0,001</td><td class="num">0,069</td><td class="num">0,174</td><td class="num">1,0</td></tr>
+        <tr><td class="key">SMH</td><td class="num">573,00</td><td class="num">0,103</td><td class="num">0,002</td><td class="num">0,087</td><td class="num">0,192</td><td class="num">1,1</td></tr>
+        <tr><td class="key">DIA</td><td class="num">515,88</td><td class="num">0,103</td><td class="num">0,002</td><td class="num">0,097</td><td class="num">0,202</td><td class="num">1,2</td></tr>
+        <tr><td class="key">GLD</td><td class="num">401,17</td><td class="num">0,103</td><td class="num">0,002</td><td class="num">0,125</td><td class="num">0,230</td><td class="num">1,4</td></tr>
+        <tr><td class="key">IWM</td><td class="num">284,10</td><td class="num">0,103</td><td class="num">0,003</td><td class="num">0,176</td><td class="num">0,282</td><td class="num">1,7</td></tr>
+        <tr><td class="key">XLK</td><td class="num">189,60</td><td class="num">0,103</td><td class="num">0,005</td><td class="num">0,264</td><td class="num">0,372</td><td class="num">2,2</td></tr>
+        <tr><td class="key">XLI</td><td class="num">169,75</td><td class="num">0,103</td><td class="num">0,006</td><td class="num">0,295</td><td class="num">0,403</td><td class="num">2,4</td></tr>
+        <tr><td class="key">XLV</td><td class="num">168,39</td><td class="num">0,103</td><td class="num">0,006</td><td class="num">0,297</td><td class="num">0,406</td><td class="num">2,4</td></tr>
+        <tr><td class="key">XLC</td><td class="num">110,81</td><td class="num">0,103</td><td class="num">0,009</td><td class="num">0,451</td><td class="num">0,563</td><td class="num">3,3</td></tr>
+        <tr><td class="key">XLY</td><td class="num">111,03</td><td class="num">0,103</td><td class="num">0,009</td><td class="num">0,450</td><td class="num">0,562</td><td class="num">3,3</td></tr>
+        <tr><td class="key">EFA</td><td class="num">104,97</td><td class="num">0,103</td><td class="num">0,009</td><td class="num">0,476</td><td class="num">0,589</td><td class="num">3,5</td></tr>
+        <tr><td class="key">XLP</td><td class="num">82,80</td><td class="num">0,103</td><td class="num">0,012</td><td class="num">0,604</td><td class="num">0,719</td><td class="num">4,2</td></tr>
+        <tr><td class="key">TLT</td><td class="num">81,25</td><td class="num">0,103</td><td class="num">0,012</td><td class="num">0,615</td><td class="num">0,730</td><td class="num">4,3</td></tr>
+        <tr><td class="key">EEM</td><td class="num">67,03</td><td class="num">0,103</td><td class="num">0,015</td><td class="num">0,746</td><td class="num">0,864</td><td class="num">5,1</td></tr>
+        <tr><td class="key">XLE</td><td class="num">64,31</td><td class="num">0,103</td><td class="num">0,015</td><td class="num">0,778</td><td class="num">0,896</td><td class="num">5,3</td></tr>
+        <tr><td class="key">SLV</td><td class="num">59,93</td><td class="num">0,103</td><td class="num">0,016</td><td class="num">0,834</td><td class="num">0,954</td><td class="num">5,6</td></tr>
+        <tr class="lo"><td class="key">XLF</td><td class="num">55,86</td><td class="num">0,103</td><td class="num">0,017</td><td class="num">0,895</td><td class="num">1,016</td><td class="num">6,0</td></tr>
+        <tr class="lo"><td class="key">XLB</td><td class="num">49,99</td><td class="num">0,103</td><td class="num">0,020</td><td class="num">1,000</td><td class="num">1,123</td><td class="num">6,6</td></tr>
+        <tr class="lo"><td class="key">XLRE</td><td class="num">42,53</td><td class="num">0,103</td><td class="num">0,023</td><td class="num">1,176</td><td class="num">1,302</td><td class="num">7,7</td></tr>
+        <tr class="lo"><td class="key">XLU</td><td class="num">41,10</td><td class="num">0,103</td><td class="num">0,024</td><td class="num">1,217</td><td class="num">1,344</td><td class="num">7,9</td></tr>
+        <tr><td class="foot" colspan="7">in rosso i simboli il cui costo è entro un fattore 2 dal miglior break-even mai misurato dal progetto (1,76 bp). Il taker crypto Alpaca, per confronto, è 25,00 bp — fuori scala rispetto a questa tabella per un fattore da 15 a 150</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box why">
+    <h4>La conseguenza di progetto: il costo entra nella ricompensa, non in una costante <span class="b b-ok">riusabile</span></h4>
+    <p>Un paniere in cui il costo varia di otto volte fra i membri non si prezza con un numero. Ma non serve nemmeno una regola nuova: <code>swing.fit_policy</code> paga già la commissione dentro la ricompensa, <code>reward = p·r − fee·|p − before|</code>. Basta che <code>fee</code> diventi un vettore per simbolo perché la policy impari da sola a non rigirare XLU e a rigirare SPY. È un cambio di tipo, non di architettura.</p>
+    <p>Lo stesso vale per <code>--fee</code>, che è già un argomento di CLI in <code>swing</code>, <code>threshold</code>, <code>stops</code>, <code>swingrule</code> e <code>oracle</code>: cambia chi lo fornisce, non chi lo consuma.</p>
+  </div>
+
+  <div class="box no">
+    <h4>«Molto veloce» non è la leva, ed è il punto su cui l'intuizione sbaglia <span class="b b-open">vincolo di venue</span></h4>
+    <p>Con la commissione a zero la curva di costo diventa <em>piatta nel numero di trade</em> — e questo invita ad aumentare la frequenza. È l'inferenza sbagliata. La curva resta <em>convessa nella velocità</em>, perché ciò che si paga a quel punto è lo spread e la selezione avversa: più veloce vai, più i tuoi fill sono quelli che qualcuno più veloce ha scelto di darti.</p>
+    <p>E il venue pone comunque un pavimento. L'API di Alpaca è REST su ordini instradati a wholesaler: latenza di decine-centinaia di millisecondi, nessun DMA, nessuna colocation. Il regime realistico è barre da 1–15 minuti con hold da minuti a ore — cioè grosso modo dove questo pipeline già vive. La leva è il costo per trade. Non va speso aumentando la frequenza per festeggiare di averlo ottenuto.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section>
+  <h2><span class="n">3</span> · Dati</h2>
+  <p class="h2sub">Alpaca, feed SIP, dal 2016 <span class="b b-no">Binance esce dal progetto</span></p>
+
+  <div class="box why">
+    <h4>L'inversione: «Perché non lo storico di Alpaca» era una critica al solo endpoint crypto</h4>
+    <p>Il documento precedente scartava lo storico Alpaca per due ragioni, entrambe specifiche del crypto: parte dal 2021 perché distribuisce i dati del venue di Alpaca stesso, e il 2023 è bucato dai delisting post-cause SEC (SOL, 417 giorni di buco; copertura 5m al 15% su YFI). <strong>Nessuna delle due esiste sull'equity.</strong> Il feed SIP è il consolidato nazionale — tutte le sedi, non quella di Alpaca — parte dal 2016 e non ha buchi di delisting su ETF che non sono stati delistati.</p>
+    <p>Con questo, Binance esce: non è più la fonte storica e non è più il venue di confronto. <code>data.binance</code> resta in repo come storia del progetto e non viene chiamato da nessun modulo nuovo.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>lo store — un file per (simbolo, intervallo), minute bar native e tutto il resto ricampionato</caption>
+      <thead><tr><th>parametro</th><th>valore</th><th>perché</th></tr></thead>
+      <tbody>
+        <tr><td><code>feed</code></td><td class="key">sip</td><td>consolidato nazionale. <code>iex</code> è il ~2–3% del volume ed è un campione distorto per qualunque cosa a frequenza alta</td></tr>
+        <tr><td><code>adjustment</code></td><td class="key">all</td><td>split <em>e</em> dividendi. Vedi sotto: l'aggiustamento dividendi va poi scontato nel costo dello short</td></tr>
+        <tr><td><code>end</code></td><td>≤ now − 15 min</td><td>il vincolo del piano gratuito. Irrilevante in backtest, vincolante in live</td></tr>
+        <tr><td>granularità base</td><td class="key">1Min</td><td>è la barra nativa. 5m e 15m si ricampionano; il contrario non si può</td></tr>
+        <tr><td>sessione</td><td>RTH 09:30–16:00 ET</td><td>l'API restituisce anche l'extended hours: va filtrata esplicitamente, non assunta assente</td></tr>
+        <tr><td>inizio</td><td class="key">2016-01-04</td><td>pavimento del dato Alpaca. Il vincolo vero è l'inception del simbolo più giovane (§4)</td></tr>
+        <tr><td>calendario</td><td>NYSE</td><td>festivi, mezze giornate (24 dic, 29 nov, …), e il cambio DST che sposta l'orario UTC due volte l'anno</td></tr>
+        <tr><td>costo</td><td class="key">$0</td><td>l'intero storico è nel piano gratuito. È l'unico input del progetto che non ha un prezzo</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>La dimensione del campione, che è uno scambio e non un miglioramento <span class="b b-msr">aritmetica</span></h3>
+  <p>Una sessione RTH è 6,5 ore: <strong>390 barre 1m, 78 a 5m, 26 a 15m</strong>, per circa 252 giorni l'anno. Contro il 24/7 crypto — 288 barre 5m al giorno, 365 giorni — il conteggio per anno di calendario crolla di un fattore 3,7.</p>
+
+  <div class="tw">
+    <table>
+      <caption>barre per simbolo, sulla griglia su cui il modello viene addestrato</caption>
+      <thead><tr><th>progetto</th><th>griglia</th><th class="num">barre/anno</th><th class="num">anni</th><th class="num">totale</th><th>copertura di regime</th></tr></thead>
+      <tbody>
+        <tr><td>crypto, 2023+</td><td class="num">15m</td><td class="num">35.040</td><td class="num">3,7</td><td class="num">128.700</td><td>un ciclo, un mercato, una discesa</td></tr>
+        <tr class="hi"><td>equity, 2016+</td><td class="num">15m</td><td class="num">6.552</td><td class="num">10,7</td><td class="num">70.100</td><td>2018 Q4, COVID, 2022, ciclo dei tassi</td></tr>
+        <tr><td>equity, 2016+</td><td class="num">5m</td><td class="num">19.656</td><td class="num">10,7</td><td class="num">210.300</td><td>idem</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Il 55% delle barre su 2,9 volte il calendario. <strong>Per un walk-forward a quattro fold è un miglioramento netto</strong>: quattro fold su 3,7 anni davano tagli a circa undici mesi di distanza, in un unico regime; su 10,7 anni ogni fold è un mercato diverso. È esattamente il punto aperto 3 del documento precedente — «un test solo, un regime solo» — chiuso dal cambio di asset class e non da un'idea.</p>
+
+  <h3>Azioni societarie <span class="b b-open">nuovo</span></h3>
+  <p>Una coppia USDT non fa split e non paga dividendi. Un ETF fa entrambi, e le due cose vanno in due posti diversi:</p>
+  <ul>
+    <li><strong>Split → nella serie.</strong> <code>adjustment=all</code> li corregge. Una serie non aggiustata produce log-return di −50% che i pivot leggono come gambe e l'etichetta come opportunità. Non negoziabile.</li>
+    <li><strong>Dividendi → nel costo, non nella serie.</strong> <code>adjustment=all</code> aggiusta anche i dividendi, il che rende il prezzo <em>total return</em>. Ma uno short <em>paga</em> il dividendo all'ex-date. Su un libro market-neutral con gamba corta permanente sono 1,5–3% l'anno che la serie aggiustata non mostra. Va in <code>costs</code>, per simbolo, e per la sola gamba corta.</li>
+    <li><strong>L'ex-date nella serie non aggiustata è un gap.</strong> Se per qualunque motivo si legge <code>adjustment=raw</code>, l'ex-date stampa un salto che non è un movimento. Il calendario delle ex-date viene dalla Corporate Actions API di Alpaca (announcements: dividendi, split, merger, spinoff, ricercabili per simbolo e intervallo di date).</li>
+  </ul>
+
+  <div class="box open">
+    <h4>La trappola che questa sezione deve ancora verificare <span class="b b-open">aperto</span></h4>
+    <p>Il documento precedente elencava due trappole nei dump Binance — <code>open_time</code> passato da millisecondi a microsecondi senza marcatore di versione, e file con riga di header — trovate solo costruendo lo store. Le trappole equivalenti su Alpaca non sono ancora note. Le tre da controllare per prime, perché rompono in silenzio: il fuso del timestamp restituito (UTC contro ET) attraverso i due cambi DST annuali; il comportamento sulle mezze giornate di borsa; e se la retroattività di <code>adjustment=all</code> riscrive le barre storiche a ogni nuovo split, il che renderebbe lo store non riproducibile e lo stamp della cache incapace di accorgersene.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section>
+  <h2><span class="n">4</span> · Universo</h2>
+  <p class="h2sub">Venti simboli, scelti sul costo quanto sulla dispersione</p>
+  <p class="lead">La cardinalità resta venti. Non è estetica: l'errore standard di una singola cross-section a venti simboli è ≈ 1/√17 ≈ 0,24, ed è il numero su cui tutta la sezione metriche del progetto è tarata. Cambiare la cardinalità significa ritarare ogni soglia di significatività già scritta.</p>
+
+  <h3>I cinque criteri, e il fatto che due sono in conflitto</h3>
+  <ol>
+    <li><strong>Prezzo per azione alto.</strong> Il costo in bp scala come 1/P (§2). È il criterio che il progetto crypto non ha mai dovuto avere.</li>
+    <li><strong>Volume alto.</strong> Spread stretto <em>in centesimi</em>, e capacità. Soglia: ADV ≥ 5M azioni o ≥ $500M nozionale.</li>
+    <li><strong>Storico lungo e completo.</strong> Inception ≤ 2016 se possibile; tutti i dati scaricabili da un solo endpoint.</li>
+    <li><strong>ETB per lo short</strong>, a borrow zero.</li>
+    <li><strong>Dispersione cross-sezionale reale.</strong> Venti cloni dell'S&amp;P hanno cross-section degenere e l'etichetta, che è un ordinamento dentro l'istante, diventa rumore diviso per una dispersione quasi nulla.</li>
+  </ol>
+  <p><strong>1 e 5 sono in conflitto</strong>, ed è la tensione che struttura la scelta: gli ETF a prezzo più alto sono quasi tutti cloni dell'S&amp;P 500 (SPY $761, IVV $765, VOO $702 — la stessa cosa tre volte), mentre le esposizioni davvero ortogonali stanno nella fascia bassa di prezzo (XLU $41, XLRE $43, XLB $50). Non si può massimizzarli entrambi con la stessa lista.</p>
+
+  <h3>La leva che risolve il conflitto, e che va misurata <span class="b b-open">misura 1 del progetto</span></h3>
+  <p>Per quasi ogni settore esistono due ETF che replicano la stessa esposizione a prezzi molto diversi, perché differiscono solo per il rapporto di conversione delle quote. L'alternativa Vanguard allo SPDR è 2–4,5 volte più cara per azione, quindi 2–4,5 volte <em>più economica</em> in punti base — <em>se</em> lo spread quotato resta di un centesimo, il che a quel livello di AUM non è scontato.</p>
+
+  <div class="tw">
+    <table>
+      <caption>lo stesso settore, due emittenti — costo a spread 1 cent, e il punto di pareggio in centesimi che deciderebbe</caption>
+      <thead><tr><th>settore</th><th>SPDR</th><th class="num">P</th><th class="num">bp</th><th>Vanguard</th><th class="num">P</th><th class="num">bp</th><th class="num">AUM V.</th><th class="num">pareggio</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>utility</td><td class="key">XLU</td><td class="num">41,10</td><td class="num">1,344</td><td class="key">VPU</td><td class="num">177,98</td><td class="num">0,389</td><td class="num">$8,1B</td><td class="num">4,3 ¢</td></tr>
+        <tr class="hi"><td>materiali</td><td class="key">XLB</td><td class="num">49,99</td><td class="num">1,123</td><td class="key">VAW</td><td class="num">223,49</td><td class="num">0,331</td><td class="num">$3,1B</td><td class="num">4,5 ¢</td></tr>
+        <tr class="hi"><td>immobiliare</td><td class="key">XLRE</td><td class="num">42,53</td><td class="num">1,302</td><td class="key">VNQ</td><td class="num">92,91</td><td class="num">0,652</td><td class="num">$37,1B</td><td class="num">2,2 ¢</td></tr>
+        <tr class="hi"><td>energia</td><td class="key">XLE</td><td class="num">64,31</td><td class="num">0,896</td><td class="key">VDE</td><td class="num">180,31</td><td class="num">0,386</td><td class="num">$10,9B</td><td class="num">2,8 ¢</td></tr>
+        <tr class="hi"><td>finanziari</td><td class="key">XLF</td><td class="num">55,86</td><td class="num">1,016</td><td class="key">VFH</td><td class="num">136,32</td><td class="num">0,477</td><td class="num">$13,1B</td><td class="num">2,4 ¢</td></tr>
+        <tr class="hi"><td>consumo dif.</td><td class="key">XLP</td><td class="num">82,80</td><td class="num">0,719</td><td class="key">VDC</td><td class="num">223,55</td><td class="num">0,331</td><td class="num">$7,8B</td><td class="num">2,7 ¢</td></tr>
+        <tr><td>consumo disc.</td><td class="key">XLY</td><td class="num">111,03</td><td class="num">0,562</td><td class="key">VCR</td><td class="num">371,96</td><td class="num">0,240</td><td class="num">$5,7B</td><td class="num">3,3 ¢</td></tr>
+        <tr><td>industriali</td><td class="key">XLI</td><td class="num">169,75</td><td class="num">0,403</td><td class="key">VIS</td><td class="num">325,54</td><td class="num">0,260</td><td class="num">$8,0B</td><td class="num">1,9 ¢</td></tr>
+        <tr><td>salute</td><td class="key">XLV</td><td class="num">168,39</td><td class="num">0,406</td><td class="key">VHT</td><td class="num">315,85</td><td class="num">0,264</td><td class="num">$19,0B</td><td class="num">1,9 ¢</td></tr>
+        <tr><td>comunicazioni</td><td class="key">XLC</td><td class="num">110,81</td><td class="num">0,563</td><td class="key">VOX</td><td class="num">189,68</td><td class="num">0,372</td><td class="num">$6,0B</td><td class="num">1,7 ¢</td></tr>
+        <tr class="lo"><td>tecnologia</td><td class="key">XLK</td><td class="num">189,60</td><td class="num">0,372</td><td class="key">VGT</td><td class="num">122,31</td><td class="num">0,520</td><td class="num">$145,8B</td><td class="num">—</td></tr>
+        <tr><td class="foot" colspan="9">«pareggio» = quanti centesimi di spread può permettersi il Vanguard restando pari allo SPDR a 1 cent. Sotto quella soglia vince Vanguard, sopra vince SPDR. VGT è l'unico caso in cui lo SPDR è già più caro per azione, quindi già più economico: nessuna decisione da prendere</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box open">
+    <h4>Misura 1, e nessuna riga di training la precede <span class="b b-open">aperto</span></h4>
+    <p>Sei settori su undici hanno un guadagno potenziale di costo fra 2× e 4×, che è dello stesso ordine del fattore che ha ucciso il progetto precedente. La decisione dipende interamente da una quantità non ancora misurata: lo <strong>spread effettivo</strong>, in centesimi, di ciascun candidato, letto sui <em>quote</em> Alpaca e non dedotto dall'high-low delle barre.</p>
+    <p>Regola di decisione, fissata prima di guardare l'output: per ogni settore vince l'emittente con il costo totale per lato più basso, calcolato con la formula di §2 e lo spread <em>mediano ponderato per il tempo</em> dentro RTH, escluse la prima e l'ultima mezz'ora di sessione. Se i due sono entro il 10%, vince quello con ADV più alto — perché la capacità è un vincolo che il backtest non vede.</p>
+  </div>
+
+  <h3>Universo U1 — venti ETF <span class="b b-open">candidato, in attesa della misura 1</span></h3>
+  <p>Il paniere primario. La colonna «emittente» resta indecisa dove la misura 1 la deve decidere.</p>
+
+  <div class="tw">
+    <table>
+      <caption>U1 — blocchi di esposizione, pensati perché la cross-section abbia dispersione</caption>
+      <thead><tr><th>#</th><th>esposizione</th><th>simbolo</th><th class="num">P</th><th class="num">bp @1¢</th><th>nota</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>mercato</td><td class="key">SPY</td><td class="num">761,69</td><td class="num">0,170</td><td>il più liquido del mondo; ancora della cross-section</td></tr>
+        <tr><td class="num">2</td><td>growth / nasdaq</td><td class="key">QQQ</td><td class="num">721,45</td><td class="num">0,174</td><td></td></tr>
+        <tr><td class="num">3</td><td>small cap</td><td class="key">IWM</td><td class="num">284,10</td><td class="num">0,282</td><td>il beta di dimensione</td></tr>
+        <tr><td class="num">4</td><td>mid cap</td><td class="key">MDY</td><td class="num">666,68</td><td class="num">0,180</td><td>riempie il buco fra SPY e IWM. ADV 1,1M azioni ma $759M nozionali: passa sul nozionale, non sul conteggio</td></tr>
+        <tr><td class="num">5</td><td>large cap value</td><td class="key">DIA</td><td class="num">515,88</td><td class="num">0,202</td><td></td></tr>
+        <tr><td class="num">6</td><td>semiconduttori</td><td class="key">SMH</td><td class="num">573,00</td><td class="num">0,192</td><td>il settore più volatile e più disperso, a prezzo alto: raro</td></tr>
+        <tr><td class="num">7</td><td>tecnologia</td><td class="key">XLK</td><td class="num">189,60</td><td class="num">0,372</td><td>vince sul VGT già a spread pari</td></tr>
+        <tr><td class="num">8</td><td>salute</td><td class="key">XLV / VHT</td><td class="num">168 / 316</td><td class="num">0,406 / 0,264</td><td>misura 1</td></tr>
+        <tr><td class="num">9</td><td>industriali</td><td class="key">XLI / VIS</td><td class="num">170 / 326</td><td class="num">0,403 / 0,260</td><td>misura 1</td></tr>
+        <tr><td class="num">10</td><td>consumo disc.</td><td class="key">XLY / VCR</td><td class="num">111 / 372</td><td class="num">0,562 / 0,240</td><td>misura 1</td></tr>
+        <tr><td class="num">11</td><td>comunicazioni</td><td class="key">XLC / VOX</td><td class="num">111 / 190</td><td class="num">0,563 / 0,372</td><td>misura 1 · XLC nato 2018-06: è il vincolo sullo storico</td></tr>
+        <tr><td class="num">12</td><td>consumo dif.</td><td class="key">XLP / VDC</td><td class="num">83 / 224</td><td class="num">0,719 / 0,331</td><td>misura 1</td></tr>
+        <tr><td class="num">13</td><td>energia</td><td class="key">XLE / VDE</td><td class="num">64 / 180</td><td class="num">0,896 / 0,386</td><td>misura 1</td></tr>
+        <tr><td class="num">14</td><td>finanziari</td><td class="key">XLF / VFH</td><td class="num">56 / 136</td><td class="num">1,016 / 0,477</td><td>misura 1</td></tr>
+        <tr><td class="num">15</td><td>utility</td><td class="key">XLU / VPU</td><td class="num">41 / 178</td><td class="num">1,344 / 0,389</td><td>misura 1 · il guadagno potenziale più grande della tabella</td></tr>
+        <tr><td class="num">16</td><td>materiali</td><td class="key">XLB / VAW</td><td class="num">50 / 223</td><td class="num">1,123 / 0,331</td><td>misura 1 · VAW ha solo $3,1B: rischio spread</td></tr>
+        <tr><td class="num">17</td><td>immobiliare</td><td class="key">XLRE / VNQ</td><td class="num">43 / 93</td><td class="num">1,302 / 0,652</td><td>misura 1 · XLRE nato 2015-10</td></tr>
+        <tr><td class="num">18</td><td>oro</td><td class="key">GLD</td><td class="num">401,17</td><td class="num">0,230</td><td>esposizione ortogonale all'azionario, a costo basso</td></tr>
+        <tr><td class="num">19</td><td>treasury lunghi</td><td class="key">TLT</td><td class="num">81,25</td><td class="num">0,730</td><td>l'unica gamba duration. Costoso ma insostituibile per la dispersione</td></tr>
+        <tr><td class="num">20</td><td>sviluppati ex-US</td><td class="key">EFA</td><td class="num">104,97</td><td class="num">0,589</td><td>alternativa IEFA $98, VEA $71: EFA è la più liquida delle tre</td></tr>
+        <tr><td class="foot" colspan="6">tutti ETB, tutti con ADV ampiamente sopra soglia. Storico comune vincolato da XLC (giugno 2018) → <strong>8,2 anni</strong>; sostituendo XLC con VOX (2004) e XLRE con VNQ (2004) lo storico comune sale al pavimento Alpaca del <strong>2016</strong>, cioè 10,7 anni</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box why">
+    <h4>Perché non venti azioni singole, e a quali condizioni entrerebbero <span class="b b-msr">decisione</span></h4>
+    <p>Le mega-cap soddisfano i criteri 1–4 meglio degli ETF: prezzo alto, volume enorme, ETB, storico lungo. Il criterio 5 le rende però un problema diverso, per una ragione che l'etichetta non può assorbire: <strong>un gap da trimestrale è una gamba che nessun lettore causale può tradare</strong>. Un salto del 10% fra la chiusura e l'apertura entra nei pivot come un estremo, entra nell'etichetta come escursione disponibile, e non è raggiungibile da nessuna regola: il prezzo non passa per i livelli intermedi. È esattamente il difetto che il documento precedente ha passato due anni a estirpare dall'etichetta — un oracolo travestito da strategia — reintrodotto dalla porta dell'asset class.</p>
+    <p>Si risolve, ma costa: serve una maschera di esclusione dal calendario earnings (che la Corporate Actions API di Alpaca <em>non</em> copre — copre dividendi, split, merger, spinoff), e un universo storico point-in-time per non selezionare i sopravvissuti di oggi. È una settimana di lavoro per testare un'ipotesi che U1 testa gratis.</p>
+    <p><strong>Regola:</strong> U2 — venti mega-cap, prezzo &gt; $100, ADV &gt; 5M azioni, quotate dal 2016, ETB — si costruisce solo se e quando U1 mostra un lordo sopra il pavimento di costo. Non prima.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section>
+  <h2><span class="n">5</span> · Target</h2>
+  <p class="h2sub"><code>swing_leg_target</code> intraday <span class="b b-msr">etichetta confermata, parametri da rimisurare</span></p>
+  <p class="lead">L'obiettivo di addestramento resta quello chiesto: dove ti trovi lungo la gamba corrente, come miscela di posizione e tempo. Ma il documento precedente ha misurato cosa quell'etichetta <em>non</em> è, e quel risultato va scritto in cima a questa sezione, non in fondo.</p>
+
+  <div class="box no">
+    <h4>Quello che <code>swing_leg_target</code> è, misurato <span class="b b-msr">misurato, sul venue vecchio</span></h4>
+    <p>È <strong>retrospettiva</strong>. Una regressione lineare sull'ultima candela la riproduce a Rank IC 0,38 out-of-sample: se un lineare point-in-time riproduce un'etichetta, è l'etichetta a essere descrittiva. E la controprova economica è netta — una GRU che ottiene <strong>Rank IC 0,4114</strong> contro questa etichetta ottiene <strong>−0,0405</strong> contro il rendimento forward a 6 barre, con il decile «compra» significativo <em>nella direzione sbagliata</em> a 24 e 72 barre.</p>
+    <p>Questo non la squalifica come obiettivo di addestramento. La squalifica come <strong>criterio di promozione</strong>. La distinzione è tutta la sezione.</p>
+  </div>
+
+  <div class="box ok">
+    <h4>Come si usa allora, ed è già l'architettura in repo <span class="b b-ok">riusabile</span></h4>
+    <p><code>swing.py</code> addestra già due volte, e lo fa per esattamente questa ragione. Un ridge sulle feature più lo stato causale della gamba raggiunge 0,62 di correlazione con <code>swing_leg_target</code> e <em>perde soldi</em>, perché il residuo si concentra sulle svolte, che è dove ogni trade si apre e si chiude.</p>
+    <ul>
+      <li><strong>Stadio 1 — Huber su <code>swing_leg_target</code>.</strong> Serve a mettere la struttura di gamba dentro l'encoder. È l'obiettivo che l'utente ha chiesto, ed è dove va.</li>
+      <li><strong>Stadio 2 — <code>fit_policy</code>, ascesa del gradiente sul P&amp;L netto</strong>, con la commissione per simbolo dentro la ricompensa e i rendimenti detrendizzati.</li>
+      <li><strong>Promozione — <code>legcheck</code> contro il prezzo</strong>, mai la Rank IC contro l'etichetta. Un miglioramento di Rank IC che non muove <code>legcheck</code> non è un miglioramento.</li>
+    </ul>
+  </div>
+
+  <h3>La decisione che struttura tutto il resto: il gap notturno <span class="b b-open">aperto, ma con una raccomandazione</span></h3>
+  <p>Una gamba che attraversa la chiusura contiene il gap di apertura del giorno dopo. Il gap è un rendimento reale — se sei in posizione lo incassi — ma non è <em>raggiungibile</em>: il prezzo non transita per i livelli intermedi, quindi ogni barriera, ogni stop e ogni take posti dentro il gap si riempiono all'apertura e non al livello. Due regimi possibili, e sono due progetti diversi:</p>
+
+  <div class="tw">
+    <table>
+      <caption>i due regimi, e cosa implica ciascuno su ogni altra sezione del documento</caption>
+      <thead><tr><th></th><th>(a) intraday-only — flat alle 16:00</th><th>(b) multi-day swing</th></tr></thead>
+      <tbody>
+        <tr><td>gap nell'etichetta</td><td>assente per costruzione</td><td>presente, e non tradabile</td></tr>
+        <tr><td>gap nel rischio</td><td>assente</td><td>è il rischio dominante overnight</td></tr>
+        <tr><td>dividendi su short</td><td>mai pagati (nessuna posizione all'ex-date)</td><td>1,5–3% l'anno di costo</td></tr>
+        <tr><td>financing / margine</td><td>4x intraday, minimo $2.000</td><td>2x overnight, interessi di margine</td></tr>
+        <tr><td><code>finestra_estremi</code></td><td>deve stare dentro 390 barre 1m</td><td>libera</td></tr>
+        <tr><td>rami</td><td>1m / 5m / 15m (il 15m a N=24 copre una sessione)</td><td>fino a 1h, ma ogni ramo lento attraversa una chiusura</td></tr>
+        <tr><td>barre disponibili</td><td>tutte</td><td>tutte</td></tr>
+        <tr><td>cosa si rinuncia</td><td>il drift overnight, dove sta gran parte del rendimento azionario</td><td>niente, ma si eredita il bias di esposizione di §1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box why">
+    <h4>Raccomandazione: (a) intraday-only, per tre ragioni che convergono</h4>
+    <ol>
+      <li><strong>Toglie il gap sia dall'etichetta sia dal rischio.</strong> È la più grande sorgente di contenuto non tradabile dell'etichetta, e si elimina con un vincolo invece che con una correzione.</li>
+      <li><strong>Il drift overnight è esattamente l'esposizione che ha ingannato il progetto precedente.</strong> Su crypto il paniere scendeva e la gamba corta sembrava brava; su equity il paniere sale e la gamba lunga sembrerà brava. Restare flat alla chiusura rimuove la variabile invece di controllarla.</li>
+      <li><strong>La PDT è stata ritirata.</strong> Fino a giugno 2026 questo regime era vietato sotto $25.000 di equity. Ora il minimo per 4x intraday è $2.000. La decisione è possibile solo da tre mesi, ed è il secondo cambiamento regolamentare — dopo la commissione a zero — che rende sensato questo progetto.</li>
+    </ol>
+    <p>Costo della scelta, dichiarato: si rinuncia al drift. Per un libro market-neutral è una rinuncia piccola, perché il drift è in gran parte comune ai venti simboli e la neutralizzazione cross-sezionale lo toglierebbe comunque.</p>
+  </div>
+
+  <h3>I parametri dell'etichetta, tutti da rimisurare <span class="b b-msr">da rimisurare</span></h3>
+  <p>L'etichetta resta la miscela di <code>data.target</code>, con i suoi due numeri liberi. Nessuno dei due si trasporta:</p>
+  <ul>
+    <li><strong><code>finestra_estremi</code></strong> — su crypto 24 barre 15m, scelta massimizzando il P&amp;L d'oracolo <em>penalizzato dal ritardo di rilevazione</em>. Il metodo si riusa integralmente (il criterio ingenuo è degenere: l'argmax cade a 3 barre e non è stazionario). Il vincolo nuovo è che a L = finestra la gamba deve restare dentro la sessione. Su 5m, W=24 sono 2 ore su 6,5 — plausibile; su 15m sono 6 ore, cioè quasi l'intera sessione, che è il tetto e non un valore.</li>
+    <li><strong><code>peso_tempo</code></strong> — 0,7 è annotato come «valore di partenza, tarabile». <code>legsweep</code> l'ha poi misurato su 117 celle e ha trovato che <em>la superficie non ha ottimo interno</em>: sale monotonamente verso finestre corte e pesi bassi, per una ragione che non è segnale (un'etichetta più lenta si ordina meglio). La colonna <code>edge = rank_ic − rsi_centered</code> è il controllo che lo dice, e alla cella migliore un RSI grezzo legge il 93% del modello. <strong>Se la griglia va rifatta qui, va rifatta con giudice il prezzo</strong> — <code>legcheck</code>, <code>swingrule</code> — e non la correlazione con l'etichetta. Rifarla sulla Rank IC riprodurrebbe lo stesso non-risultato a un costo di 117 addestramenti.</li>
+    <li><strong>δ della Huber</strong> — mediana di <code>|target|</code> sul solo train. Cambia con l'etichetta e quindi con l'asset class. 2,1 non ha significato qui.</li>
+    <li><strong>Orizzonte di purging</strong> — la distanza al pivot successivo, misurata p50 28 / p95 124 / p99 202 / max 754 barre su crypto. Va rimisurata in barre di sessione, e il massimo è il numero che conta perché il purging è esatto.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ 6 -->
+<section>
+  <h2><span class="n">6</span> · Feature</h2>
+  <p class="h2sub">Le 29 colonne tengono, il loro significato no <span class="b b-msr">da rimisurare</span></p>
+
+  <p>Tutte e 29 le colonne di <code>features</code> sono causali e scale-free per costruzione, e si applicano a una candela azionaria esattamente come a una candela crypto. Nessuna va cancellata. Tre cose cambiano intorno a loro.</p>
+
+  <h3>1 · La selezione 28 → 12 non si trasferisce <span class="b b-no">decaduto</span></h3>
+  <p>Era già dichiarata non trasferibile fra etichette — su <code>cross_sectional_return</code> la classifica era un'altra e <code>close_position_in_window</code>, la feature più importante di uno step per un fattore trenta, valeva 0,006. Fra asset class non si trasferisce a maggior ragione. Vale la regola che il documento precedente ne ha tratto: <strong>la selezione va rifatta per architettura, o non fatta affatto. Il set è un parametro (<code>--features</code>), non una cancellazione.</strong> Per la GRU, le 28 complete battevano il set ridotto su quattro fold su quattro.</p>
+
+  <h3>2 · La stagionalità intraday è nuova, e colpisce sei colonne <span class="b b-open">aperto</span></h3>
+  <p>Il volume crypto non ha una forma giornaliera marcata. Il volume azionario ha una <strong>U</strong> pronunciata: l'asta di apertura e l'ultima mezz'ora concentrano una quota enorme della giornata, e i primi cinque minuti hanno volume e volatilità di un ordine di grandezza sopra il mezzogiorno. Sei colonne ne sono dominate:</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>colonna</th><th>cosa misura su crypto</th><th>cosa misurerebbe su equity senza correzione</th></tr></thead>
+      <tbody>
+        <tr><td class="key">log_volume_vs_median</td><td>attività anomala</td><td>che ora è</td></tr>
+        <tr><td class="key">volume_trend</td><td>accelerazione dell'attività</td><td>in quale metà della U ti trovi</td></tr>
+        <tr><td class="key">signed_volume</td><td>pressione direzionale</td><td>ora del giorno, col segno</td></tr>
+        <tr><td class="key">on_balance_volume_zscore</td><td>accumulo</td><td>dominato dalla coda di apertura</td></tr>
+        <tr><td class="key">distance_from_vwap_pct</td><td>scostamento dal prezzo medio</td><td>ancorato all'apertura, non alla finestra</td></tr>
+        <tr><td class="key">realized_volatility</td><td>volatilità</td><td>stessa U, in seconda battuta</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Due rimedi possibili, e vanno confrontati, non scelti a priori: <strong>(i)</strong> normalizzare ogni colonna di volume contro la mediana storica <em>della stessa fascia oraria</em> — stessa aritmetica di <code>log_volume_vs_median</code> con un raggruppamento in più; <strong>(ii)</strong> lasciarle grezze e aggiungere due colonne di orario (seno e coseno della frazione di sessione trascorsa), lasciando al modello il compito di condizionare. La (ii) è meno codice e più onesta come misura; la (i) rende le colonne confrontabili fra simboli, che è ciò che serve a un'etichetta cross-sezionale. <strong>Nota di cautela:</strong> l'ora del giorno è la variabile più prevedibile del mercato, quindi un modello che la riceve produrrà una Rank IC alta contro qualunque etichetta con struttura intraday. Va controllata con una baseline a sola ora del giorno, esattamente come <code>rsi_centered</code> controlla la griglia di <code>legsweep</code>.</p>
+
+  <h3>3 · N va riscelto, e il ramo lento ha un tetto <span class="b b-msr">da rimisurare</span></h3>
+  <p>La regola «N in barre, non in ore» tiene e resta il motivo per cui i rami sono complementari invece di essere copie ricampionate dello stesso. Ma nel regime intraday-only si aggiunge un vincolo che su crypto non poteva esistere: <strong>il ramo più lento, a N step, deve stare dentro una sessione</strong>. Con 6,5 ore:</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ramo</th><th class="num">N</th><th class="num">copertura</th><th>esito</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1m</td><td class="num">24</td><td class="num">24 min</td><td>microstruttura <span class="b b-ok">dentro</span></td></tr>
+        <tr><td class="num">5m</td><td class="num">24</td><td class="num">2h</td><td><span class="b b-ok">dentro</span></td></tr>
+        <tr class="hi"><td class="num">15m</td><td class="num">24</td><td class="num">6h</td><td>una sessione: è il tetto <span class="b b-ok">dentro</span></td></tr>
+        <tr class="lo"><td class="num">30m</td><td class="num">24</td><td class="num">12h</td><td>1,8 sessioni: attraversa una chiusura <span class="b b-no">fuori</span></td></tr>
+        <tr class="lo"><td class="num">1h</td><td class="num">24</td><td class="num">24h</td><td>3,7 sessioni <span class="b b-no">fuori</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Tre rami invece di quattro</strong>, griglia base a 1m invece che a 5m. È una riduzione di capacità, e va detto: il progetto precedente aveva comunque misurato che il multi-ramo <em>perde</em> sul ramo singolo, su quattro fold su quattro, sia con encoder distinti sia condivisi. Perdere un ramo qui costa quindi meno di quanto sembri.</p>
+  <p>Resta l'eccezione onesta già dichiarata: <code>step</code> e <code>max_step</code> del PSAR sono accelerazioni e non finestre, quindi <code>finestra_estremi</code> non li determina. 0,02 / 0,2 resta convenzione.</p>
+</section>
+
+<!-- ============================================================ 7 -->
+<section>
+  <h2><span class="n">7</span> · Tempo di sessione, allineamento, leakage</h2>
+  <p class="h2sub">Il refactor principale del progetto <span class="b b-no">la regola precedente assumeva tempo continuo</span></p>
+  <p class="lead">Questa è la sezione in cui il progetto costa davvero. Tutto il resto è ritarare costanti; questo è cambiare un'assunzione che sta sotto ogni modulo.</p>
+
+  <div class="box no">
+    <h4>La regola che non tiene più</h4>
+    <p>«Ogni frame è indicizzato sull'<em>open</em> della sua barra, quindi una barra <code>b</code> sul timeframe <code>tf</code> chiude a <code>b + tf</code>. Le colonne di ramo sono piazzate sulla griglia 5m a <code>label + tf − 5m</code> e forward filled.» È corretta, è testata per troncamento, ed è <strong>l'unica cosa che non doveva mai rompersi</strong> nel progetto precedente. Assume che fra due barre adiacenti passi sempre una durata di barra.</p>
+    <p>Su equity RTH fra la barra delle 15:55 e quella delle 09:30 del giorno dopo passano 17 ore e mezza, e nel weekend 65. Cosa si rompe, concretamente:</p>
+    <ul>
+      <li><strong>Il forward fill attraversa la notte</strong> e porta la colonna del ramo 15m di ieri sera dentro l'apertura di oggi, come se fosse fresca.</li>
+      <li><strong>Il campionamento sull'orologio</strong> <code>index.floor(step) == index</code> genera timestamp alle 03:00 dove non esiste barra.</li>
+      <li><strong>ATR e ogni finestra rolling</strong> leggono il gap di apertura come range di una barra, gonfiando la volatilità misurata su ogni apertura.</li>
+      <li><strong><code>find_pivots</code> con order = W</strong> confronta 24 barre a sinistra e a destra che possono stare in giorni diversi: un massimo di ieri pomeriggio e uno di stamattina, separati da un gap, diventano la stessa oscillazione.</li>
+      <li><strong><code>complete()</code></strong>, che riempie i buchi con barre a volume zero, riempirebbe la notte con 210 barre finte.</li>
+    </ul>
+  </div>
+
+  <div class="box ok">
+    <h4>La correzione, e perché è più piccola di quanto sembri</h4>
+    <p><strong>Indice di barra locale alla sessione.</strong> Il frame si costruisce sulla timeline di sessione <em>concatenata</em> — le barre di ogni sessione una dietro l'altra, con un intero progressivo che non salta mai — e il timestamp resta come colonna, usata solo per lo split temporale, il join fra rami e il calendario delle azioni societarie.</p>
+    <p>La ragione per cui il refactor è contenuto: <strong>tutto ciò che sta a valle è già posizionale</strong>. <code>features</code> lavora su finestre di N barre, <code>find_pivots</code> su order barre, il tensore su 24 step, il purging su indici di riga. Nessuno di questi legge un timestamp. Cambiano due cose: <code>dataset.build</code> (campionamento e piazzamento dei rami) e la costruzione della griglia in <code>data.candles.complete</code>, che deve riempire i buchi <em>dentro</em> la sessione e mai fra sessioni.</p>
+    <p>Regola derivata, da mettere a test: <strong>nessuna finestra rolling e nessun forward fill attraversa una chiusura.</strong> Il test è lo stesso per troncamento che già protegge l'allineamento — si tronca la serie a una chiusura e si verifica che nessuna colonna della sessione successiva cambi.</p>
+  </div>
+
+  <h3>Cosa resta identico <span class="b b-ok">riusabile</span></h3>
+  <ul>
+    <li><strong>Il principio di anticipazione.</strong> Ogni ramo legge solo fino alla candela già chiusa: alla barra delle 10:05 il ramo 15m vede quella chiusa alle 10:00, non quella in formazione. Una barra di anticipo sul ramo lento regala dodici barre di futuro. Invariato, e il test per troncamento lo verifica come prima.</li>
+    <li><strong>Purging esatto e non embargo.</strong> <code>train = train[pivot_succ_idx &lt; idx_taglio]</code>, su ogni confine, train→valid quanto train→test. Un valid non purgato contamina l'early stopping. L'unica cosa che cambia è la distribuzione delle distanze, che va rimisurata in barre di sessione.</li>
+    <li><strong>Walk-forward a quattro fold, niente split per simbolo.</strong> Con 10,7 anni di storico i quattro tagli cadono in regimi diversi invece che nello stesso, che è il guadagno più grande del cambio di asset class.</li>
+    <li><strong>Warm-up.</strong> Ogni campione richiede 2N barre per ramo — N di sequenza più le N che il primo step guarda all'indietro. Su griglia di sessione va contato in barre di sessione, quindi le prime sessioni dello store escono dal campione.</li>
+  </ul>
+
+  <div class="box open">
+    <h4>Extended hours: dentro le feature, fuori dal trading? <span class="b b-open">aperto</span></h4>
+    <p>Alpaca permette di operare 04:00–20:00 ET, e le barre extended-hours arrivano dall'API per default. Sono 192 barre 5m al giorno invece di 78 — 2,5 volte il campione. Ma lo spread in extended hours è da 5 a 20 volte più largo, il che le rende inutilizzabili per <em>eseguire</em> alla luce di §2.</p>
+    <p>La domanda aperta è se debbano entrare come <em>input</em> pur restando fuori dall'esecuzione: il pre-market contiene la reazione alle notizie notturne, che è informazione vera sull'apertura. Costo di farlo: l'indice di sessione diventa a due livelli, e le colonne di volume vedono un regime di liquidità completamente diverso nelle stesse colonne. <strong>Default: fuori</strong> — si aggiungono solo se una misura dedicata mostra che valgono, perché il default sbagliato qui è quello che raddoppia la complessità dell'indice temporale per un guadagno non dimostrato.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section>
+  <h2><span class="n">8</span> · Normalizzazione, modello, metriche</h2>
+  <p class="h2sub">Tre sezioni che sopravvivono quasi intatte <span class="b b-ok">riusabile</span></p>
+
+  <h3>Normalizzazione <span class="b b-msr">metodo riusabile, costanti da rimisurare</span></h3>
+  <pre>z = clip((x − mediana) / IQR, ±CLIP) × SCALE</pre>
+  <p>Statistiche stimate <strong>solo sul train</strong> e applicate invariate a validazione, test e live; <code>apply</code> non legge mai il frame a cui è applicata. Invariato. Il clip serve per lo stesso motivo — le colonne grezze coprono ordini di grandezza diversi e il quantile scaling lascia outlier a decine di IQR, che sui gate della GRU pesano quanto tutto il resto. <code>CLIP = 5</code> troncava lo 0,46% dei valori sui dati crypto: la percentuale va rimisurata, perché le code di un ETF settoriale non sono quelle di una altcoin. Il rank cross-sezionale (<code>normalize.cross_rank</code>) resta e resta attivabile con <code>--rank</code>, col suo costo noto: la predizione smette di essere calcolabile per un simbolo da solo, e <code>predict_frame</code> deve continuare a rifiutare un checkpoint ranked.</p>
+
+  <h3>Modello <span class="b b-ok">riusabile</span></h3>
+  <p>GRU indipendente per ramo, concatenazione degli stati finali, testa densa lineare senza attivazione in uscita. Tutto invariato, incluse le due ragioni: nessuna <code>tanh</code> in uscita perché annullerebbe il gradiente proprio sui pivot, e GRU invece di LSTM perché a 24 step il vantaggio dell'LSTM non esiste e la GRU ha ~25% di parametri in meno. Cambia solo il numero di rami, da quattro a tre (§6).</p>
+  <p>Gli iperparametri restano valori di partenza non tarati — H=32, un layer, dropout 0,2, AdamW, lr 1e-3, batch 512, grad clip 1,0, early stopping su Rank IC di valid e <strong>mai sulla loss</strong>. La loss è cardinale, la metrica è ordinale. δ della Huber è l'unica costante del modello che è davvero una misura, e va rifatta (§5).</p>
+
+  <h3>Metriche <span class="b b-ok">riusabile</span></h3>
+  <p>Il set di segnale qlib, calcolato per data sulla cross-section e poi aggregato. Con venti simboli l'errore standard della correlazione per cross-section è ≈ 1/√17 ≈ 0,24 — identico, perché la cardinalità è identica — quindi i singoli IC per data restano quasi puro rumore ed è solo la media su migliaia di date a essere informativa.</p>
+  <p>Resta valido anche il correttivo più recente: <strong>l'ICIR grezzo non è una significatività</strong> quando l'etichetta ha orizzonte sovrapposto. Su etichetta a 72h e griglia oraria, un <em>t</em> ingenuo su 10.944 date leggeva 31,9 dove 153 blocchi non sovrapposti leggevano 5,1. <code>metrics.signal(pred, target, horizon=...)</code> restituisce <code>rank_ic_se</code>, <code>rank_ic_t</code> e <code>blocks</code>, e su etichetta di gamba intraday il fattore di sovrapposizione va ricalcolato sulla durata tipica della gamba, non assunto.</p>
+  <p>Resta obbligatorio anche <code>metrics.spearman</code> al posto di <code>Series.corr(method="spearman")</code>: pandas importa scipy <em>pigramente</em> da dentro <code>nanops</code>, quindi la chiamata sopravvive a ogni controllo di import e a ogni test in un venv che ce l'ha, e cade solo in produzione. <code>tests/test_deploy.py</code> continua a far rispettare entrambe le metà.</p>
+</section>
+
+<!-- ============================================================ 9 -->
+<section>
+  <h2><span class="n">9</span> · Economia e criterio di promozione</h2>
+  <p class="h2sub">Cosa deve produrre, per valere la pena</p>
+
+  <div class="box why">
+    <h4>L'esistenza del margine, dimostrata sui numeri vecchi <span class="b b-msr">aritmetica, non previsione</span></h4>
+    <p>Prendendo i lordi già misurati sul venue precedente e sostituendo <em>solo</em> il costo — 0,3 bp per lato, media prudente per U1 — il segno cambia ovunque. <strong>Questi non sono numeri su equity</strong>, e il lordo non si trasporta (§1). Servono a dimostrare una cosa sola: che la distanza che il progetto non è mai riuscito a coprire è dello stesso ordine del risparmio di costo.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <caption>le stesse misure, con il solo costo sostituito — lordo crypto, costo equity</caption>
+      <thead><tr><th>misura</th><th class="num">trade/anno</th><th class="num">lordo</th><th class="num">netto @25 bp</th><th class="num">netto @0,3 bp</th><th class="num">break-even</th></tr></thead>
+      <tbody>
+        <tr><td><code>exhaustcheck --price</code>, 1h</td><td class="num">2.413,7</td><td class="num pos">+0,409</td><td class="num neg">−11,660</td><td class="num pos">+0,264</td><td class="num">0,85 bp</td></tr>
+        <tr><td><code>exhaustcheck --price</code>, 3D</td><td class="num">70,2</td><td class="num pos">+0,025</td><td class="num neg">−0,326</td><td class="num pos">+0,021</td><td class="num">1,76 bp</td></tr>
+        <tr><td><code>threshold --at 0.4</code></td><td class="num">195,8</td><td class="num pos">+0,083</td><td class="num neg">−0,894</td><td class="num pos">+0,071</td><td class="num">2,13 bp</td></tr>
+        <tr><td><code>threshold</code> q 0.70</td><td class="num">237,6</td><td class="num pos">+0,167</td><td class="num neg">−1,019</td><td class="num pos">+0,153</td><td class="num">3,52 bp</td></tr>
+        <tr><td class="foot" colspan="6">log per anno per simbolo. Il lordo di ogni riga è in larga parte esposizione corta a un paniere sceso del 49%: va riguadagnato, non ereditato</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Il criterio di promozione, dichiarato prima di guardare qualunque output <span class="b b-ok">riusabile, rafforzato</span></h3>
+  <p>Il documento precedente promuoveva sulla Rank ICIR contro l'etichetta e ha pagato quella scelta con due anni di misure su una quantità che non era il prezzo. Qui il criterio è, in ordine, e ogni riga è una condizione di sbarramento:</p>
+  <ol>
+    <li><strong><code>legcheck</code> contro il rendimento forward.</strong> Decile «compra» positivo e decile «vendi» negativo, entrambi con |t| &gt; 2, e monotonia fra i due. Senza questa riga non c'è niente su cui una regola possa agire, e nessuna regola la recupera.</li>
+    <li><strong>Lordo sopra il suo controllo a esposizione fissa.</strong> <code>rotation_null</code>, almeno 500 rotazioni, z &gt; 2. Sul venue precedente il lordo reale batteva il null con p = 0,33 — cioè non lo batteva.</li>
+    <li><strong>Netto positivo col costo per simbolo di §2</strong>, non con una media.</li>
+    <li><strong>Information ratio, non log per anno.</strong> Un libro market-neutral che rende il 4% l'anno con bassa correlazione al mercato vale più di uno che rende l'8% essendo lungo di beta. Con 4x intraday disponibile a partire da $2.000 di equity, il rendimento è una leva; lo Sharpe no. Questo sostituisce il «log per anno» che il documento precedente citava ovunque.</li>
+    <li><strong>Ogni comparazione con dispersione sui quattro fold.</strong> Invariato, e con 10,7 anni i quattro fold sono finalmente quattro regimi.</li>
+  </ol>
+
+  <div class="box no">
+    <h4>Cosa non rifare — la lista ereditata, che vale identica qui</h4>
+    <ul>
+      <li><strong>Leggere un win rate come un edge.</strong> 0,545 ± 0,013 su 1577 trade è tre sigma sopra la moneta e non vale niente, perché il trade medio era negativo.</li>
+      <li><strong>Confrontare una regola long-only col solo buy-and-hold.</strong> Su un periodo in discesa faceva sembrare bravura lo stare flat; su un periodo in salita farà sembrare bravura lo stare lunghi. Serve il controllo a esposizione fissa, in entrambe le direzioni.</li>
+      <li><strong>Cercare la colpa nella regola di trading.</strong> <code>legcheck</code> è senza regola e senza commissioni. Se è piatta lì, la regola non è il problema.</li>
+      <li><strong>Leggere un hit rate per dimensione del movimento sul <em>hold</em> di una regola a isteresi</strong> senza la colonna delle durate accanto. È la stessa variabile, ordinata.</li>
+      <li><strong>Fidarsi di un file <code>pred-*.parquet</code> senza controllarne la breadth.</strong> <code>d.groupby(d.index.get_level_values(0)).size().mean()</code>. Se non è ~20, ogni metrica cross-sezionale su quel file è diluita.</li>
+      <li><strong>Migliorare la Rank IC contro l'etichetta e chiamarlo progresso.</strong> La predizione che faceva 0,4114 contro l'etichetta faceva −0,0405 contro il prezzo.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================ 10 -->
+<section>
+  <h2><span class="n">10</span> · Ordine delle misure</h2>
+  <p class="h2sub">Il più economico che può uccidere il progetto, per primo</p>
+  <p class="lead">Nessuna riga di training precede la misura 3. È deliberato: il progetto precedente ha speso ore di GPU per ottimizzare una quantità che una misura da cinque minuti avrebbe squalificato.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th class="num">#</th><th>misura</th><th class="num">costo</th><th>cosa decide</th><th>cosa la chiude in negativo</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0</td><td>Chiudere <code>legsweep</code> con un <code>legcheck</code> sulla cella argmax (0,2 / 12)</td><td class="num">5 min</td><td>se la griglia crypto ha un vincitore, prima di abbandonarla</td><td>decile piatto → la griglia non aveva un vincitore, come <code>edge</code> già suggeriva (0,0330 contro 0,0298)</td></tr>
+        <tr><td class="num">1</td><td><strong>Spread effettivo per candidato</strong>, dai quote Alpaca, mediana ponderata per tempo dentro RTH esclusa la prima e l'ultima mezz'ora</td><td class="num">3 h</td><td>SPDR contro Vanguard per sei settori, e l'universo U1 definitivo</td><td>nulla: questa misura non può fallire, può solo decidere</td></tr>
+        <tr><td class="num">2</td><td><code>costs.py</code> + <code>fee</code> per simbolo in tutta la catena</td><td class="num">3 h</td><td>il modello di costo</td><td>self-check: con fee piatta i numeri del progetto precedente devono tornare identici</td></tr>
+        <tr><td class="num">3</td><td>Store Alpaca 1m SIP, U1, RTH, <code>adjustment=all</code></td><td class="num">4 h</td><td>i dati</td><td>buchi o retroattività dell'aggiustamento (§3)</td></tr>
+        <tr><td class="num">4</td><td><strong>Tempo di sessione</strong> — indice locale, niente ffill oltre la chiusura, test per troncamento</td><td class="num">1 g</td><td>la correttezza di ogni misura successiva</td><td>—</td></tr>
+        <tr class="hi"><td class="num">5</td><td><strong><code>exhaustcheck --price</code> e il baseline di <code>factor</code> su U1, col costo vero. Nessun training.</strong></td><td class="num">1 h</td><td><em>se il progetto ha senso</em></td><td>lordo ≤ 0 contro <code>rotation_null</code> → nessun lavoro di modello lo salva, e sono stati spesi due giorni invece di due settimane</td></tr>
+        <tr><td class="num">6</td><td><code>oracle</code> — le due letture, lag 0 e lag W, e <code>finestra_estremi</code></td><td class="num">2 h</td><td>W, e il metro contro cui si quota tutto</td><td>—</td></tr>
+        <tr><td class="num">7</td><td><code>linear</code> — allarme leakage, attesa Rank IC ≈ 0 sull'etichetta predittiva</td><td class="num">1 h</td><td>che §7 sia stato fatto bene</td><td>Rank IC alta → c'è leakage di sessione, si torna alla 4</td></tr>
+        <tr><td class="num">8</td><td><code>gbm --horizon</code>, poi <code>selection</code> rifatta su U1</td><td class="num">4 h</td><td>IC di riferimento, e il set di colonne</td><td>—</td></tr>
+        <tr><td class="num">9</td><td><code>swing</code> due stadi, quattro fold, cinque seed; δ rimisurato</td><td class="num">1 g</td><td>il modello</td><td>il criterio di §9, in ordine</td></tr>
+        <tr><td class="num">10</td><td>Paper trading: locate sugli ETB via API, e slippage reale contro il mid</td><td class="num">1 sett.</td><td>se la misura 1 era ottimista, e se un libro short ad alta rotazione è eseguibile</td><td>un locate per ogni ingresso short → la regola always-in non è eseguibile e va ripensata long-only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box open">
+    <h4>Le due incognite che nessun backtest vede <span class="b b-open">aperto</span></h4>
+    <p><strong>Il locate.</strong> La doc Alpaca dice che le vendite allo scoperto richiedono un locate approvato prima dell'ordine, in lotti tondi da 100 azioni, <em>monouso</em> — chiuso lo short, per rifarlo serve un nuovo locate. Il borrow sugli ETB è a costo zero, ma se l'obbligo di locate vale anche per gli ETB, una regola always-in che flippa ~200 volte l'anno per simbolo fa 200 chiamate di locate per simbolo, con la loro latenza e la loro possibilità di fallire. <strong>È la cosa più a rischio dell'intero progetto ed è verificabile in paper il primo giorno.</strong> Se cade, U1 resta valido ma il libro diventa long-only più un hedge di indice, che è una strategia diversa e va prezzata come tale.</p>
+    <p><strong>La dispersione cross-sezionale.</strong> L'intera etichetta è un ordinamento dentro l'istante, diviso per la dispersione dell'istante. Venti ETF settoriali USA condividono un fattore di mercato molto forte, e <em>a frequenza intraday potrebbero condividerlo più di quanto facessero venti altcoin</em>. Se <code>sd_t</code> è piccola, l'etichetta è rumore diviso per un numero piccolo. È una misura da un'ora sullo store, e va fatta subito dopo la 3 — prima ancora della 5.</p>
+  </div>
+</section>
+
+<footer>
+  <p><strong>Stato:</strong> specifica di progetto. Nessun numero di P&amp;L in questo documento è stato misurato su equity. I costi di §2 sono verificati su documento ufficiale; i prezzi di §2 e §4 sono reali al 2026-09-19 e gli spread sono <em>assunti</em> a un centesimo, che è un limite inferiore da sostituire con la misura 1.</p>
+  <p><strong>Fonti primarie:</strong> Alpaca Brokerage Fee Schedule (2026-09-01) · FINRA Information Notice 03/17/26 (SEC §31, $20,60/M dal 4 apr 2026) · FINRA Trading Activity Fee ($0,000195/azione, cap $9,79, dal 1 gen 2026) · Alpaca <em>Market Data API plans</em> e <em>Market Data FAQ</em> · Alpaca <em>Margin and Short Selling</em> e blog ETB · Alpaca <em>Intraday Margin Framework</em> (ritiro PDT, 4 giu 2026).</p>
+  <p><strong>Moduli riusati senza modifiche:</strong> <code>split</code> · <code>metrics</code> · <code>normalize</code> · <code>data.pivots</code> · <code>legs</code> · <code>swing.fit_policy</code> · <code>swingrule.rotation_null</code> · <code>legcheck</code> · <code>threshold</code> · <code>stops</code> · <code>oracle</code><br>
+  <strong>Da modificare:</strong> <code>dataset.build</code> (tempo di sessione) · <code>data.candles</code> (equity, non crypto) · <code>oracle.FEE</code> → <code>costs</code> per simbolo · <code>features</code> (stagionalità intraday, tre rami)<br>
+  <strong>Nuovi:</strong> <code>data.alpaca_equities</code> · <code>costs</code> · <code>calendar</code> (NYSE, mezze giornate, DST)<br>
+  <strong>Fuori dal progetto:</strong> <code>data.binance</code></p>
+</footer>
+
+</div>
+</body>
+</html>

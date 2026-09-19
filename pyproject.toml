@@ -1,0 +1,41 @@
+[project]
+name = "alpacatrader"
+version = "0.1.0"
+description = "Swing intraday su equity USA: dati Alpaca, ricerca e pagina di visualizzazione."
+requires-python = ">=3.12"
+dependencies = [
+    "pandas==2.3.1",
+    # Pinned, and the pin is the fix rather than a preference — inherited from the previous
+    # project for the same reason: numpy 2.5 turned the bare `np.timedelta64(n)` into a
+    # DeprecationWarning and pandas 2.x builds one on every duration constant here. pandas 3
+    # fixes it; until then 2.4.3 is the last numpy that does not raise it.
+    "numpy==2.4.3",
+    "alpaca-py==0.42.0",
+    "streamlit==1.47.1",
+    "plotly==6.2.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.6",
+]

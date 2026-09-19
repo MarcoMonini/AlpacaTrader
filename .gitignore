@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Tooling
+.serena/
+.ruff_cache/
+.pytest_cache/
+.idea/
+
+# macOS
+.DS_Store
+
+# Credentials
+.env
+
+# Market data store (root only: src/alpacatrader/data/ is a package)
+/data/
+
+# Local dev launch config
+/.claude/
