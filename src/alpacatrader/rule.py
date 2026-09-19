@@ -37,10 +37,37 @@ import pandas as pd
 from alpacatrader import columns, panel
 from alpacatrader.costs import per_side_bp
 
-THETA = 0.2  # top and bottom fifth: four symbols a side out of twenty, the widest sensible book
+# Measured 2026-09-19: the book's width has an interior optimum at 0.40 on a plateau running from
+# 0.35 to 0.50 (ratios 0.256 / 0.260 / 0.259 / 0.255), so the choice is flat rather than a peak.
+# Wider is better and that was not the expected direction: holding 14.7 names of 20 makes a name
+# churning at the boundary cost almost nothing, and turnover falls from 28,313 a year at θ=0.10 to
+# 15,403 while the gross falls far less than proportionally. 0.05 is not on the curve at all — one
+# name a side plus the both-legs rule leaves the book flat 90% of the time.
+THETA = 0.4
 
 # Measure 5b, taken 2026-09-19 on `stretch`, sign −1, θ=0.2. Two levers swept, and the answer is
 # that neither closes the gap. `ratio` is gross over cost; it has to reach 1.0 to break even.
+#
+# THE FOUR LEVERS, all measured on `stretch` sign −1, and two of the four make it worse:
+#
+#   lever                     ratio            verdict
+#   decision stride           0.212 -> 0.067   harmful, and not marginally
+#   magnitude threshold       0.230 -> 0.079   harmful; a bare cut makes the book flicker
+#   window                    0.212 -> 0.257   +21%, but its optimum is outside the hour ceiling
+#   book width θ              0.230 -> 0.260   +13%, and inside the ceiling
+#
+# Best configuration the constraints admit: window 20, stride 1, θ=0.40, no threshold — ratio 0.260,
+# break-even 0.243 bp against IWM's 0.281 and the basket's median 0.730. Still 3.85x short, from 4.7x.
+#
+# **Widening the book makes the hour ceiling free.** θ=0.40 at window 20 reads 0.260 against the
+# 0.257 that θ=0.20 needed window 30 to reach, so the constraint M4 fixed now costs nothing.
+#
+# **What the three failures say together.** Frequency fails because the signal decays in minutes;
+# the threshold fails because the signal lives in the *rank* and a cut filters on magnitude, which
+# is orthogonal to it; and at θ=0.50 the book holds 18.4 names of 20 — almost no membership left to
+# change — and still turns over 12,949 a year, 51 a session against the 4 it owes. That residue is
+# sign changes and reweighting, not names entering and leaving. `stretch` is not a factor to hold,
+# it is an ordering that is rebuilt every bar, and rebuilding it every bar is exactly what costs.
 #
 #   DECISION STRIDE, window 15          WINDOW, stride 1
 #   stride  min   gross   ratio         window  rows     gross   ratio   breakeven bp
@@ -69,20 +96,40 @@ THETA = 0.2  # top and bottom fifth: four symbols a side out of twenty, the wide
 # 0.730 the basket's median costs. Closing 4.7x needs the untested levers: selectivity (a threshold
 # on the signal's magnitude, which is *not* hysteresis) and the book's width θ.
 DRAWS = 500  # §9 asks for at least 500 rotations before quoting a z
+# The largest window the one-hour activation ceiling of M4 admits: 20 bars of 3m is exactly an hour.
+# The unconstrained optimum is 30 (ratio 0.257 against 0.230), and the ceiling is kept deliberately.
+CEILING_WINDOW = 20
 SESSIONS_PER_YEAR = 252
 
 
-def positions(signal: pd.DataFrame, usable: pd.Series, theta: float = THETA, sign: int = 1) -> pd.DataFrame:
+def positions(
+    signal: pd.DataFrame, usable: pd.Series, theta: float = THETA, sign: int = 1, cut: float = 0.0
+) -> pd.DataFrame:
     """A dollar-neutral book: long the top `theta` of the cross-section, short the bottom, flat else.
 
     `sign` flips the reading, because a column whose Rank IC is negative is traded the other way
     round — `stretch` and `streak` both lead the price downwards, so the tradable rule buys the
     *least* stretched. Weights are 1/n a side so the two legs are the same size whatever the
     cross-section's width that instant.
+
+    **`cut` is selectivity, and it is not hysteresis.** Hysteresis makes the decision depend on the
+    position already held; this only refuses to take one unless the signal is far enough from zero.
+    `stretch` is already in units of the bar's own volatility, so the threshold is scale-free and
+    means the same thing on SMH at $560 and on UUP at $28.
+
+    **A leg that empties makes the book flat, not one-sided.** With a threshold on, a row can offer
+    four candidates to buy and none to sell; holding only the long side would be taking market
+    exposure, which is the one thing `rotation_null` exists to detect and the whole book is built to
+    avoid. Both legs or neither.
     """
     masked = signal.where(np.broadcast_to(usable.to_numpy()[:, None], signal.shape))
-    ranked = (sign * masked).rank(axis=1, pct=True)
+    score = sign * masked
+    ranked = score.rank(axis=1, pct=True)
     long, short = ranked > 1 - theta, ranked <= theta
+    if cut > 0:
+        long, short = long & (score >= cut), short & (score <= -cut)
+    both = np.broadcast_to((long.any(axis=1) & short.any(axis=1)).to_numpy()[:, None], long.shape)
+    long, short = long & both, short & both
     weights = long.astype(float).div(long.sum(axis=1).replace(0, np.nan), axis=0) - short.astype(float).div(
         short.sum(axis=1).replace(0, np.nan), axis=0
     )
@@ -219,6 +266,47 @@ def sweep(p: dict, fee: pd.Series, windows, strides, sign: int = -1, name: str =
     return pd.DataFrame(rows)
 
 
+def selectivity(p: dict, fee: pd.Series, cuts, window: int, thetas=(THETA,), sign: int = -1, name: str = "stretch"):
+    """One row per (threshold, book width): does concentrating the book pay for it?
+
+    The lever the frequency sweep left untested. A threshold trades fewer bars and holds fewer
+    names, so the cost falls; whether the *gross* falls faster is the question, and it is the same
+    question the window asked in a different variable.
+
+    `live` is the share of tradable rows the book is actually in the market on — the number that
+    says whether a threshold is selecting or merely starving.
+    """
+    ret = panel.forward(p, 1)
+    session, usable = p["session"], p["usable"]
+    years = session.nunique() / SESSIONS_PER_YEAR
+    tradable = int(usable.sum())
+    signal = columns.exhaustion(p, window)[name]
+    rows = []
+    for theta in thetas:
+        for cut in cuts:
+            pos = positions(signal, usable, theta=theta, sign=sign, cut=cut)
+            held = pos.abs().sum(axis=1) > 0
+            daily = by_session(pos, ret, session, fee)
+            traded = float(turnover(pos, session).sum().sum()) / years
+            earned, spent = gross(pos, ret, years), cost(pos, session, fee, years)
+            rows.append(
+                {
+                    "theta": theta,
+                    "cut": cut,
+                    "live": round(100 * held.sum() / tradable, 1),
+                    "names": round(float(pos[held].abs().gt(0).sum(axis=1).mean()), 1) if held.any() else 0.0,
+                    "gross": round(earned, 4),
+                    "cost": round(spent, 4),
+                    "net": round(earned - spent, 4),
+                    "ratio": round(earned / spent, 3) if spent else np.nan,
+                    "ir": round(float(daily.mean() / daily.std() * np.sqrt(SESSIONS_PER_YEAR)), 2),
+                    "turnover": round(traded, 0),
+                    "breakeven_bp": round(earned / traded * 1e4, 3) if traded else np.nan,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def fees(p: dict) -> pd.Series:
     """Cost per side in basis points per symbol, from the measured spreads of M1b."""
     from alpacatrader.universe import U1
@@ -301,6 +389,26 @@ def _selfcheck() -> None:
     assert cost(steady, session, dear, years) > cost(steady, session, cheap, years)
     assert np.isclose(cost(steady, session, cheap, years), 0.5 * 2 * days * 0.3 / 1e4 / years)
 
+    # --- selectivity -------------------------------------------------------------------------------
+    plain = positions(pd.DataFrame(rng.normal(size=(n, k)), columns=close.columns), p["usable"])
+    assert (plain.abs().sum(axis=1) > 0).all(), "with no threshold the book is always in the market"
+
+    # A threshold nobody can clear leaves the book flat rather than one-sided.
+    never = positions(pd.DataFrame(rng.normal(size=(n, k)), columns=close.columns), p["usable"], cut=99.0)
+    assert (never.abs().sum(axis=1) == 0).all(), "an impossible threshold means flat, not half a book"
+
+    # A threshold that only one side can clear also means flat: both legs or neither.
+    lopsided = pd.DataFrame(2.0, index=close.index, columns=close.columns)
+    lopsided.iloc[:, :2] = 3.0  # every name positive, so nothing clears the short side at cut 1
+    assert (positions(lopsided, p["usable"], cut=1.0).abs().sum(axis=1) == 0).all()
+
+    # And a reachable threshold trades less than none at all, while staying neutral when it trades.
+    some = positions(pd.DataFrame(rng.normal(size=(n, k)), columns=close.columns), p["usable"], cut=1.0)
+    live = some.abs().sum(axis=1) > 0
+    assert 0 < live.mean() < 1, "a usable threshold selects rather than starving or passing everything"
+    assert np.allclose(some[live].sum(axis=1).to_numpy(), 0.0, atol=1e-12), "still dollar-neutral"
+    assert turnover(some, session).sum().sum() < turnover(plain, session).sum().sum()
+
     # --- the decision stride -----------------------------------------------------------------------
     churn = positions(pd.DataFrame(rng.normal(size=(n, k)), columns=close.columns), p["usable"])
     for stride in (2, 5, 10):
@@ -342,6 +450,14 @@ if __name__ == "__main__":
         built = panel.build()
         out = sweep(built, fees(built), windows=(5, 10, 15), strides=(1, 2, 3, 5, 10, 15, 30))
         print(out.sort_values("net", ascending=False).to_string(index=False))
+    elif "--cuts" in sys.argv:
+        built = panel.build()
+        out = selectivity(built, fees(built), cuts=(0.0, 0.5, 1.0, 1.5, 2.0, 3.0), window=CEILING_WINDOW)
+        print(out.to_string(index=False))
+    elif "--theta" in sys.argv:
+        built = panel.build()
+        out = selectivity(built, fees(built), cuts=(0.0,), window=CEILING_WINDOW, thetas=(0.35, 0.4, 0.45, 0.5))
+        print(out.to_string(index=False))
     elif "--windows" in sys.argv:
         built = panel.build()
         out = sweep(built, fees(built), windows=(15, 20, 25, 30, 40), strides=(1, 2))

@@ -93,8 +93,16 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
       ✔ **finestra: leva reale ma piccola.** Ottimo interno a w=30 (+21% sul rapporto), piatto a 40
       ⚠ l'ottimo (w=30 = 90 min, fondo 180) **sfora il tetto di attivazione di 1 ora** che cappa w a 20
       ⚠ miglior pareggio 0,242 bp contro 0,281 del nome più economico: ancora sotto
-- [ ] **M5c** le due leve non provate: **selettività** (soglia sulla magnitudine, non isteresi) e
-      **larghezza del libro** θ. Servono ~3,9× sul rapporto lordo/costo, la finestra ne ha dati 1,21
+- [x] **M5c** ✅ **2026-09-19** — selettività e larghezza del libro
+      ✘ **soglia sulla magnitudine: dannosa.** 0,230 → 0,079. Il costo *sale* a cut 0,5–1,0 perché
+        il libro sfarfalla dentro e fuori — è l'argomento misurato per l'isteresi, rimandata
+      ✔ **θ: leva reale, e nella direzione opposta a quella attesa.** Più largo è meglio: ottimo a
+        0,40 su un plateau 0,35–0,50. +13%, e rende **gratis il tetto di un'ora**
+      ✔ miglior configurazione ammessa: finestra 20, stride 1, θ=0,40 → rapporto **0,260**,
+        pareggio **0,243 bp** contro 0,281 (IWM) e 0,730 (mediana U1)
+      ⚠ **restano 3,85×.** Due leve su quattro peggiorano; le due che aiutano danno insieme +23%
+- [ ] **M6** con una domanda in più: `stretch` è un ordinamento che si rinnova a ogni barra, non un
+      fattore da tenere. Serve un segnale con **emivita più lunga**, ed è quello che l'oracolo cerca
 
 ## Fase D — etichetta, leakage, riferimento
 
