@@ -647,6 +647,61 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <p><strong>Indice di barra locale alla sessione.</strong> Il frame si costruisce sulla timeline di sessione <em>concatenata</em> — le barre di ogni sessione una dietro l'altra, con un intero progressivo che non salta mai — e il timestamp resta come colonna, usata solo per lo split temporale, il join fra rami e il calendario delle azioni societarie.</p>
     <p>La ragione per cui il refactor è contenuto: <strong>tutto ciò che sta a valle è già posizionale</strong>. <code>features</code> lavora su finestre di N barre, <code>find_pivots</code> su order barre, il tensore su 24 step, il purging su indici di riga. Nessuno di questi legge un timestamp. Cambiano due cose: <code>dataset.build</code> (campionamento e piazzamento dei rami) e la costruzione della griglia in <code>data.candles.complete</code>, che deve riempire i buchi <em>dentro</em> la sessione e mai fra sessioni.</p>
     <p>Regola derivata, da mettere a test: <strong>nessuna finestra rolling e nessun forward fill attraversa una chiusura.</strong> Il test è lo stesso per troncamento che già protegge l'allineamento — si tronca la serie a una chiusura e si verifica che nessuna colonna della sessione successiva cambi.</p>
+
+  <div class="box ok">
+    <h4>Misura 4 — griglia e finestre fissate, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p><strong>Griglia 3m, non 1m.</strong> §6 proponeva la griglia base a un minuto. Misurato sullo
+    store: a 1m la breadth media è <strong>18,94</strong> e la cross-section è completa solo nel
+    <strong>33,1%</strong> degli istanti, contro 19,74 e 80,2% a 3m. Il vincolo è UUP, che copre il
+    67,7% delle barre a 1m e il 90,3% a 3m. §9 rifiuta un file la cui breadth non sia ~20, e a 1m lo
+    sarebbe per due terzi del tempo. 390 minuti fanno 130 barre da tre esatte, 210 ne fanno 70.</p>
+    <p><strong>Tetto di attivazione: un'ora.</strong> Decisione di progetto, più stretta del «dentro
+    la sessione» di §6. Con il warm-up pagato <em>ogni</em> sessione — nessuna finestra attraversa
+    una chiusura — le <code>2N</code> barre si tolgono da 130, non da tutto lo store.</p>
+    <p><strong>N = 15 (45 min), fissato.</strong> <strong>W = 15, provvisorio</strong>: §5 assegna
+    <code>finestra_estremi</code> alla misura 6, che la sceglie sul P&L d'oracolo penalizzato dal
+    ritardo. Su 130 barre, <code>130 − max(2N, W) − W = 85</code> righe utilizzabili, il 65%.</p>
+    <div class="tw"><table>
+      <caption>W misurato su barre 3m di cinque simboli dal 2024, con un estremo centrato a
+      finestra mobile al posto di <code>find_pivots</code>: i valori assoluti si sposteranno, l'ordine no</caption>
+      <thead><tr><th class="num">W</th><th class="num">durata</th><th class="num">gambe/sessione</th>
+      <th class="num">gamba mediana</th><th class="num">R² posizione ~ ora</th>
+      <th class="num">costo a operare ogni gamba</th></tr></thead>
+      <tbody>
+        <tr><td class="num">10</td><td class="num">30 min</td><td class="num">6,4</td><td class="num">36 min</td><td class="num">0,057</td><td class="num">23,5%/anno</td></tr>
+        <tr><td class="num">12</td><td class="num">36 min</td><td class="num">5,0</td><td class="num">42 min</td><td class="num">0,082</td><td class="num">18,4%/anno</td></tr>
+        <tr><td class="num"><strong>15</strong></td><td class="num">45 min</td><td class="num">3,5</td><td class="num">51 min</td><td class="num">0,130</td><td class="num">12,9%/anno</td></tr>
+        <tr><td class="num">16</td><td class="num">48 min</td><td class="num">3,1</td><td class="num">51 min</td><td class="num">0,149</td><td class="num">11,4%/anno</td></tr>
+        <tr><td class="num">20</td><td class="num">60 min</td><td class="num">2,0</td><td class="num">63 min</td><td class="num"><strong>0,226</strong></td><td class="num">7,4%/anno</td></tr>
+      </tbody>
+    </table></div>
+    <div class="box no" style="margin-top:14px">
+      <p><strong>W grande confonde l'etichetta con l'orologio.</strong> A W=20 la sessione contiene
+      due gambe, e la posizione lungo la gamba <em>è</em> l'ora del giorno: il <strong>23%</strong>
+      della varianza dell'etichetta è il calendario. §6 avverte che un modello a cui arriva l'ora
+      produce Rank IC alta contro qualunque etichetta con struttura intraday, e le sei colonne di
+      volume gliela passano attraverso la U giornaliera. Su un'etichetta che §5 ha già misurato come
+      retrospettiva, sarebbero due confondimenti che si moltiplicano. <strong>16 e 20 sono esclusi
+      dalla griglia della misura 6</strong>, che resta {10, 12, 15}.</p>
+      <p>Il costo va nella direzione opposta — operare ogni gamba costa il 23,5% l'anno a W=10 e il
+      7,4% a W=20, al costo mediano del paniere — ed è precisamente per questo che la scelta è della
+      misura 6 e non di una preferenza: il P&L d'oracolo penalizzato dal ritardo prezza entrambi i
+      lati dello stesso compromesso.</p>
+    </div>
+    <p><strong>Il taglio delle mezze giornate, che nessuna sezione prevedeva.</strong> Il nastro
+    continua a stampare per ore dopo la campana dell'una: IWM il 3-07-2018 porta <strong>48 barre da
+    tre minuti fra le 13:00 e le 15:21</strong>, contigue abbastanza da sembrare un pomeriggio
+    normale. Non sono un mercato — nulla poteva essere comprato o venduto a quei prezzi — e lasciate
+    dentro sarebbero il 60% delle righe di quella sessione, dentro le feature, dentro l'etichetta e
+    dentro il P&L. <code>session.frame</code> le taglia: le 21 mezze giornate tornano a 70 barre
+    esatte. Restano 2.671 sessioni piene a 130 e <strong>una sola anomala</strong> (2019-08-12, 121
+    barre); i circuit breaker del marzo 2020 restano a 130, perché a 3m una sospensione di quattordici
+    minuti non lascia bucket vuoti.</p>
+    <p>Il <strong>test per troncamento</strong> passa sullo store reale: tagliata la serie a una
+    chiusura, nessuna colonna della sessione precedente cambia, in entrambe le direzioni. I salti fra
+    sessioni consecutive misurano da <strong>17,5 a 89,5 ore</strong>, che è la dimensione esatta
+    dell'assunzione caduta.</p>
+  </div>
   </div>
 
   <h3>Cosa resta identico <span class="b b-ok">riusabile</span></h3>

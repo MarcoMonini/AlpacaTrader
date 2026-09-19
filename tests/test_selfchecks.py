@@ -17,6 +17,7 @@ MODULES = [
     "alpacatrader.dispersion",
     "alpacatrader.data.store",
     "alpacatrader.calendar",
+    "alpacatrader.session",
 ]
 
 

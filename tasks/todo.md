@@ -64,9 +64,14 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
       ✔ non serviva lo store: finestre campionate su tre regimi (2018 / 2022 / 2026)
       ⚠ il regime **recente è il più povero** (0,000585 a 5m contro 0,000891 nel 2022)
       ✔ la dispersione cresce come √barra: i membri si muovono quasi indipendentemente
-- [ ] **M4** **tempo di sessione** — indice locale, timestamp degradato a colonna · 1 g → M3
+- [x] **M4** ✅ **2026-09-19** — tempo di sessione, indice locale, timestamp a colonna → M3
       ✔ decisione di regime: **(a) intraday-only, flat 16:00** (raccomandata)
-      ✔ tre rami 1m/5m/15m, griglia base 1m (il 15m a N=24 è il tetto)
+      ✔ **griglia 3m** e non 1m: a 1m breadth 18,94 e cross-section completa solo nel 33,1%
+      ✔ tetto di attivazione **1 ora**; **N = 15** fissato (45 min), **W = 15 provvisorio** → M6
+      ✔ griglia W per la M6 ridotta a **{10, 12, 15}**: a W=20 il 23% dell'etichetta è l'ora del giorno
+      ✔ **taglio delle mezze giornate**: il nastro stampa fino alle 15:21 dopo la campana dell'una;
+        48 barre su 118 non erano mercato. Le 21 mezze giornate tornano a 70 barre esatte
+      ✔ 85 righe usabili su 130 (65,4%), verificato sullo store reale
       ✔ **test per troncamento**: si tronca a una chiusura, nessuna colonna della sessione
         successiva cambia
       ✔ test di anticipazione invariato: alle 10:05 il ramo 15m vede la barra chiusa alle 10:00
