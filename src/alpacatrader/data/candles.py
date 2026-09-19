@@ -4,9 +4,11 @@ Unlike the crypto endpoint of the previous project, the stock one needs credenti
 `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` (Alpaca's own names, so every other tool in the
 ecosystem reads the same two). Paper-account keys are enough — nothing here places an order.
 
-`ALPACA_FEED` picks the feed and defaults to `iex`, which is what the free plan serves. `sip` is
-the consolidated tape and needs a market-data subscription; the spec's section 3 is why it is the
-one to measure on, IEX being ~2-3% of the volume and a biased sample at intraday frequency.
+`ALPACA_FEED` picks the feed and defaults to `sip`, the consolidated tape. Measured 2026-09-19: the
+historical SIP endpoint answers on free paper keys back to 2016-01-04, and only the *real-time*
+feed is paid — so there is no reason to train on anything else. IEX is ~2-3% of the volume (SPY 1m
+at 2024-06-03 14:30 reads v=577 / n=14 against SIP's v=75,038 / n=2,495) and its daily history
+starts in 2018 with gaps, which is what made the first run of `universe` unusable.
 
 Bars come back split- and dividend-adjusted (`adjustment=all`) and indexed by the *open* time of
 the bar in UTC, which is the alignment rule everything downstream depends on.
@@ -124,7 +126,7 @@ def get_candles(symbol: str, timeframe: str, days: int, rth: bool = True) -> pd.
                 timeframe=TIMEFRAMES[timeframe],
                 start=datetime.now(timezone.utc) - timedelta(days=days),
                 adjustment=Adjustment.ALL,
-                feed=DataFeed(os.environ.get("ALPACA_FEED", "iex")),
+                feed=DataFeed(os.environ.get("ALPACA_FEED", "sip")),
             )
         )
         .df
