@@ -350,6 +350,51 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <p>Regola di decisione, fissata prima di guardare l'output: per ogni settore vince l'emittente con il costo totale per lato più basso, calcolato con la formula di §2 e lo spread <em>mediano ponderato per il tempo</em> dentro RTH, escluse la prima e l'ultima mezz'ora di sessione. Se i due sono entro il 10%, vince quello con ADV più alto — perché la capacità è un vincolo che il backtest non vede.</p>
   </div>
 
+  <div class="box ok">
+    <h4>Misure 1a e 1b — chiuse, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p><strong>1a, le esposizioni.</strong> L'universo è stato deciso <em>prima</em> del costo e
+    senza di esso: venti esposizioni scelte minimizzando la correlazione massima a coppie dei
+    rendimenti daily, stimate sul primo fold (2016 → 2019) e solo verificate dopo.
+    Correlazione media <strong>0,3537 in stima e 0,3517 dopo il taglio</strong> — la scorrelazione
+    è una proprietà, non un fit. Contro il paniere di dodici settori che questa sezione teme, la
+    dispersione cross-sezionale è <strong>+26%</strong> in stima e <strong>+22%</strong> dopo.
+    La coppia peggiore è XLB/XLU a 0,841, dal ciclo dei tassi e non da holding sovrapposte.</p>
+    <p>Due coppie erano in rapporto di contenimento — KRE dentro XLF, XBI dentro XLV — che nessuna
+    correlazione può vedere perché è un fatto su cosa i fondi detengono. Risolte in favore del
+    <em>contenitore</em>, più liquido e più capiente, coerentemente coi criteri 2 e 3.</p>
+    <p><strong>1b, gli strumenti — e questa misura ha ucciso l'ipotesi centrale della sezione.</strong>
+    La leva era che un Vanguard settoriale costa 2–4,5× più per azione e sarebbe quindi 2–4,5× più
+    economico in punti base, <em>«se lo spread quotato resta di un centesimo, il che a quel livello
+    di AUM non è scontato»</em>. Non resta di un centesimo. Spread mediani ponderati per il tempo,
+    misurati su quote SIP del 16–18 settembre, 24 finestre da 30s dentro RTH escluse le mezz'ore:</p>
+    <div class="tw"><table>
+      <caption>la colonna «pareggio» di questa sezione ha previsto <strong>tutte e sette</strong> le
+      decisioni: ogni Vanguard sopra la sua soglia perde, l'unico sotto vince</caption>
+      <thead><tr><th>esposizione</th><th>SPDR / iShares</th><th class="num">bp</th>
+      <th>alternativa</th><th class="num">spread</th><th class="num">bp</th>
+      <th class="num">pareggio §4</th><th>vince</th></tr></thead>
+      <tbody>
+        <tr><td>utility</td><td>XLU 1¢</td><td class="num">1,332</td><td>VPU</td><td class="num">7¢</td><td class="num">2,056</td><td class="num">4,3¢</td><td>XLU</td></tr>
+        <tr><td>materiali</td><td>XLB 1¢</td><td class="num">1,108</td><td>VAW</td><td class="num">12¢</td><td class="num">2,754</td><td class="num">4,5¢</td><td>XLB</td></tr>
+        <tr><td>salute</td><td>XLV 2¢</td><td class="num">0,703</td><td>VHT</td><td class="num">16¢</td><td class="num">2,637</td><td class="num">1,9¢</td><td>XLV</td></tr>
+        <tr><td>consumo dif.</td><td>XLP 1¢</td><td class="num">0,714</td><td>VDC</td><td class="num">9¢</td><td class="num">2,107</td><td class="num">2,7¢</td><td>XLP</td></tr>
+        <tr><td>comunicazioni</td><td>XLC 1¢</td><td class="num">0,556</td><td>VOX</td><td class="num">7¢</td><td class="num">1,930</td><td class="num">1,7¢</td><td>XLC</td></tr>
+        <tr><td>finanziari</td><td>XLF 1¢</td><td class="num">1,015</td><td>VFH</td><td class="num">2¢</td><td class="num">0,843</td><td class="num">2,4¢</td><td><strong>VFH</strong></td></tr>
+        <tr><td>immobiliare</td><td>XLRE 1¢</td><td class="num">1,289</td><td>VNQ</td><td class="num">1¢</td><td class="num">0,646</td><td class="num">2,2¢</td><td><strong>VNQ</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>U1:</strong> SMH · UUP · XLU · SHY · XOP · SLV · VFH · XHB · XRT · XLP · XLV · JNK ·
+    VNQ · FXI · XLB · TLT · XLC · EFA · IWM · TIP. Costo per lato da <strong>0,281 bp</strong> (IWM)
+    a <strong>2,170 bp</strong> (XHB): il paniere copre ancora <strong>7,7×</strong> di costo, quindi
+    il vettore per simbolo di §2 resta necessario dopo la scelta degli strumenti, non prima.</p>
+    <div class="box open" style="margin-top:14px">
+      <p><strong>Tre nomi stanno sopra 1,76 bp</strong> — XHB 2,170, XOP 1,927, UUP 1,899 — cioè
+      sopra il miglior punto di pareggio che questo progetto abbia mai misurato. Non li squalifica:
+      il pareggio è una proprietà di una regola, non di uno strumento. Ma una regola che paga solo
+      su quei tre non ha superato la barra che il progetto precedente non ha mai superato.</p>
+    </div>
+  </div>
+
   <h3>Universo U1 — venti ETF <span class="b b-open">candidato, in attesa della misura 1</span></h3>
   <p>Il paniere primario. La colonna «emittente» resta indecisa dove la misura 1 la deve decidere.</p>
 

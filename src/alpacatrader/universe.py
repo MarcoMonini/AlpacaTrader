@@ -135,6 +135,50 @@ E1 = [
 ]
 
 
+# Measure 1b, taken 2026-09-19 on SIP quotes of 2026-09-16/17/18: time-weighted median spread
+# inside RTH, first and last half hour excluded, 24 windows of 30s per instrument. The winner of
+# each exposure by the cost formula of `costs`, with the measured spread rather than §2's assumed
+# penny. Reproduce with `python -m alpacatrader.data.quotes --run`.
+#
+# **The measurement killed §4's central hypothesis, and §4's own arithmetic is what killed it.**
+# The lever was that a Vanguard sector fund costs 2–4.5x more per share and would therefore be
+# 2–4.5x cheaper in basis points — *if its quoted spread stayed at a penny, which at that level of
+# AUM is not a given*. It does not stay at a penny: VPU quotes 7c, VDC 9c, VAW 12c, VHT 16c. The
+# break-even column of §4 predicted every one of the seven decisions correctly: each Vanguard fund
+# quotes above its own threshold and loses, except VFH at 2c against a 2.4c break-even, which wins.
+# The framework was right and the penny was wrong.
+#
+# Cost still spans 7.7x across U1, from IWM at 0.281 bp to XHB at 2.170. The per-symbol fee vector
+# is not a refinement here, it is the only honest way to price this basket.
+#
+# Three names cost more than 1.76 bp per side, which is the best break-even this project has ever
+# measured: XHB 2.170, XOP 1.927, UUP 1.899. They are not disqualified — the break-even is a
+# property of a rule, not of an instrument — but a rule that only pays on those three is a rule
+# that has not cleared the bar the previous project never cleared.
+U1 = {
+    "semiconductors": "SMH",  # 0.729 bp, $560.76 @ 7c  (SOXX 0.971)
+    "dollar": "UUP",  # 1.899 bp, $28.38 @ 1c
+    "utilities": "XLU",  # 1.332 bp, $41.47 @ 1c  (VPU 2.056 @ 7c, break-even was 4.3c)
+    "short_treasury": "SHY",  # 0.730 bp, $81.32 @ 1c  (VGSH 0.987)
+    "oil_gas_e_p": "XOP",  # 1.927 bp, $192.40 @ 7c
+    "silver": "SLV",  # 0.962 bp, $59.36 @ 1c
+    "financials": "VFH",  # 0.843 bp, $136.39 @ 2c  (XLF 1.015 — the one Vanguard that wins)
+    "homebuilders": "XHB",  # 2.170 bp, $97.25 @ 4c  (ITB 2.375)
+    "retail": "XRT",  # 0.717 bp, $83.06 @ 1c
+    "staples": "XLP",  # 0.714 bp, $83.40 @ 1c  (VDC 2.107 @ 9c, break-even was 2.7c)
+    "healthcare": "XLV",  # 0.703 bp, $168.40 @ 2c  (VHT 2.637 @ 16c, break-even was 1.9c)
+    "high_yield": "JNK",  # 0.642 bp, $94.58 @ 1c  (HYG 0.751)
+    "real_estate": "VNQ",  # 0.646 bp, $93.88 @ 1c  (XLRE 1.289 — below its 2.2c break-even)
+    "china": "FXI",  # 1.593 bp, $34.20 @ 1c
+    "materials": "XLB",  # 1.108 bp, $50.74 @ 1c  (VAW 2.754 @ 12c, break-even was 4.5c)
+    "long_treasury": "TLT",  # 0.731 bp, $81.22 @ 1c  (VGLT 1.082)
+    "communications": "XLC",  # 0.556 bp, $112.44 @ 1c  (VOX 1.930 @ 7c, break-even was 1.7c)
+    "developed_ex_us": "EFA",  # 0.585 bp, $105.76 @ 1c  (VEA 0.812)
+    "small_cap": "IWM",  # 0.281 bp, $286.08 @ 1c  (VB 0.964 @ 5c) — the cheapest in the book
+    "inflation_linked": "TIP",  # 0.586 bp, $105.58 @ 1c  (VTIP 1.136)
+}
+
+
 def representative(exposure: str) -> str:
     """The instrument standing for an exposure while it is being chosen. Measure 1b replaces it."""
     return EXPOSURES[exposure][0]
@@ -311,12 +355,20 @@ def _selfcheck() -> None:
 
 
 def _consistency() -> None:
-    """`E1` must name exposures that exist and carry no container/slice pair. No network."""
+    """`E1` and `U1` must agree with each other and with `EXPOSURES`. No network."""
     assert len(E1) == SIZE and len(set(E1)) == SIZE
     assert not set(E1) - set(EXPOSURES), f"E1 names unknown exposures: {set(E1) - set(EXPOSURES)}"
     inside = {e for e in E1 if CONTAINED_IN.get(e) in set(E1)}
     assert not inside, f"E1 holds both a container and its slice: {inside}"
     assert all(EXPOSURES[e] for e in E1), "every exposure needs at least one instrument"
+
+    # One instrument per exposure, each one a candidate of the exposure it was chosen for. The
+    # second half is what stops a rename or a copied line from quietly pointing an exposure at a
+    # fund that does not track it — the kind of error no correlation would flag as wrong.
+    assert list(U1) == E1, "U1 must cover E1, in its order"
+    for exposure, instrument in U1.items():
+        assert instrument in EXPOSURES[exposure], f"{instrument} is not a candidate for {exposure}"
+    assert len(set(U1.values())) == SIZE, "an instrument cannot stand for two exposures"
 
 
 if __name__ == "__main__":

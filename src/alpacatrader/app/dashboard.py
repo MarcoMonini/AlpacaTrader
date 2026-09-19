@@ -14,7 +14,8 @@ from __future__ import annotations
 import plotly.graph_objects as go
 import streamlit as st
 
-from alpacatrader.data.candles import CLOSE, EXCHANGE, OPEN, SYMBOLS, TIMEFRAMES, get_candles
+from alpacatrader.data.candles import CLOSE, EXCHANGE, OPEN, TIMEFRAMES, get_candles
+from alpacatrader.universe import U1
 
 # Cached because a rerun fires on every widget touch and each one would otherwise be a download.
 # Five minutes: long enough that moving a slider is free, short enough that the last bar is fresh.
@@ -63,11 +64,17 @@ def main() -> None:
     st.set_page_config(page_title="Alpaca Trader", layout="wide")
     st.title("Alpaca Trader")
 
+    # The exposure next to the ticker: XHB is a decision about homebuilders, and a list of twenty
+    # tickers alone does not say that anywhere.
+    exposures = {instrument: name for name, instrument in U1.items()}
+
     symbol = st.sidebar.selectbox(
         "Symbol",
-        SYMBOLS,
+        list(U1.values()),
+        format_func=lambda s: f"{s} · {exposures[s]}",
         accept_new_options=True,
-        help="a starting universe, not the one the spec settles on. Type any other US ticker to draw it.",
+        help="U1 — one instrument per exposure, chosen on decorrelation and then on measured "
+        "spread. Type any other US ticker to draw it.",
     )
     timeframe = st.sidebar.selectbox("Timeframe", list(TIMEFRAMES), index=2)
     # Calendar days and not sessions, because that is the window the request is actually made on.

@@ -45,11 +45,9 @@ TIMEFRAMES = {
 EXCHANGE = "America/New_York"
 OPEN, CLOSE = time(9, 30), time(16, 0)
 
-# A starting universe, not the one the spec will settle on: section 4 leaves the twenty symbols
-# open on a spread measurement nobody has taken yet. These are liquid, long-history and cheap in
-# basis points, which is enough for a page whose job is to prove the pipe works. The picker takes
-# a typed symbol too, so the list is a starting point rather than a ceiling.
-SYMBOLS = ["SPY", "QQQ", "XLK", "XLV", "XLE", "XLF", "AAPL", "MSFT", "NVDA", "AMZN"]
+# No symbol list lives here. This module fetches whatever it is asked for, and the universe is a
+# measured decision that belongs to `universe` (E1, then U1) — which reads *this* module to take it.
+# A list here would either duplicate that decision or invert the dependency.
 
 # The repository root, from this file rather than from the working directory: the page is started
 # by an absolute path as often as not, and `.env` does not move when the caller does.

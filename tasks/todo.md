@@ -12,29 +12,33 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
       ✔ **esito: piatta.** ic_raw −0,0194 a 6 barre, max |t| = 1,68 su 30 decili, nessuna
         monotonia. Rank IC 0,4753 contro l'etichetta. Verdetto in §5 dello schema
       ✘ la griglia non aveva un vincitore. **Non si rifà sulla Rank IC**
-- [ ] **M1a** **esposizioni scorrelate → `E1`** · 3 h · *il costo non entra qui*
+- [x] **M1a** ✅ E1, 2026-09-19 — **esposizioni scorrelate → `E1`** · 3 h · *il costo non entra qui*
       ↳ il dataset decide cosa il modello può imparare; il costo decide con quale strumento lo si
         compra (M1b) e quanto costa simularlo (M2)
       ✔ serve solo storico **daily** dei candidati, non lo store intraday
       ✔ venti esposizioni + matrice di correlazione + una motivazione per ciascuna
+      ✔ **esito: corr media 0,3537 in stima → 0,3517 dopo. sd_t +26% / +22% contro i soli settori**
+      ✔ contenimento KRE⊂XLF e XBI⊂XLV risolto in favore del contenitore
       ✔ stimata **sul primo fold**, verificata e non rifatta sugli altri (§8: chi decide, decide
         sul train)
-- [ ] **M1b** strumento per esposizione — spread effettivo → **U1** · 3 h → M1a
+- [x] **M1b** ✅ U1, 2026-09-19 — strumento per esposizione — spread effettivo → **U1** · 3 h → M1a
       ✔ tabella candidati (spread mediano ponderato RTH, esclusa prima/ultima mezz'ora) + costo bp
       ✔ `SYMBOLS` = **venti** strumenti, ognuno col commento che dice **quale esposizione implementa**
       ✘ nessuno strumento accettabile in un'esposizione → si cambia strumento o la si dichiara non
         tradabile; **non** la si sostituisce con una più economica ma correlata a un'altra
-- [ ] **M2** `costs.py`, fee per simbolo · 3 h → M1b *(i numeri; il codice si scrive prima)*
+- [x] **M2** ✅ `costs.py`, fee per simbolo · 3 h → M1b *(i numeri; il codice si scrive prima)*
       ✔ il suo posto è la **simulazione**, non il dataset
+      ✔ **esito: la tabella di §2 si riproduce a 1e-3 bp**; lo scarto è l'arrotondamento della
+        tabella (somma di componenti già arrotondate), non la formula
       ✔ `0,103 + 0,975/P + 5000·s/P`; SEC §31 e TAF in config, mai costanti
       ✔ dividendo su short, per simbolo, **solo gamba corta**
       ✔ self-check: a fee piatta i numeri del progetto precedente tornano **identici**
-- [ ] **Checkpoint A** — E1 e U1 definiti e **distinti**, costo per simbolo confinato alle
+- [x] **Checkpoint A** ✅ **raggiunto** — E1 e U1 definiti e **distinti**, costo per simbolo confinato alle
       simulazioni, M0 con verdetto
 
 ## Fase B — store e tempo di sessione
 
-- [ ] **M3a** `ALPACA_FEED` default **`sip`** (misurato: gratuito, dal 2016) · 5 min
+- [x] **M3a** ✅ *anticipata: IEX daily parte dal 2018 con buchi, M1a non era misurabile* — `ALPACA_FEED` default **`sip`** (misurato: gratuito, dal 2016) · 5 min
 - [ ] **M3** `data.alpaca_equities` + `calendar` (NYSE) · 4 h → M1b
       ✔ `feed=sip`, `adjustment=all`, base **1Min**, RTH esplicita, dal 2016-01-04
       ✔ stamp della cache che rifiuta parametri diversi
