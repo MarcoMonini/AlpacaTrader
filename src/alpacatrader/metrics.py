@@ -111,7 +111,13 @@ def signal(
         if rank and horizon is not None and session is not None:
             b = blocked(per, horizon, session)
             out["rank_ic_se"], out["rank_ic_t"], out["blocks"] = b["se"], b["t"], b["blocks"]
-    out["breadth"] = float((pred.notna() & target.notna()).sum(axis=1).mean())
+    # Counted over the rows that actually carry a cross-section, not over every row handed in. A
+    # caller passing a whole fold at a 30-bar horizon also passes the rows near each close, whose
+    # forward return is NaN by design; averaging their zeroes in reported 15.4 where the panel holds
+    # 19.46, which §9 would read as a diluted file and reject. The correlation was never affected —
+    # `by_bar` drops those rows — so the number was wrong and nothing computed from it was.
+    counts = (pred.notna() & target.notna()).sum(axis=1)
+    out["breadth"] = float(counts[counts >= MIN_BREADTH].mean())
     return out
 
 
@@ -133,11 +139,23 @@ def _selfcheck() -> None:
     assert np.isclose(by_bar(y**3, y).iloc[0], (row**3).corr(row))
     assert np.isclose(by_bar(y**3, y, rank=True).iloc[0], (row**3).corr(row, method="spearman"))
 
-    # A row with too few symbols has no cross-section, and one with none is not counted.
+    # Three kinds of row, and breadth has to treat them differently. A row of four symbols out of
+    # six is thin and counts; a row of two has no cross-section at all and is not a thin row but an
+    # absent one; a row of none is the same. Averaging the last two in as zeroes is what made a
+    # full panel read as a diluted one.
     thin = y.copy()
-    thin.iloc[0, 2:] = np.nan
-    assert np.isnan(by_bar(thin, y).iloc[0]) and by_bar(thin, y).iloc[1:].notna().all()
-    assert signal(thin, y)["breadth"] < 6.0
+    thin.iloc[0, 4:] = np.nan  # four symbols: thin, usable, counted
+    assert by_bar(thin, y).notna().all(), "four symbols still make a cross-section"
+    assert signal(thin, y)["breadth"] < 6.0, "and a thin row pulls the average down"
+
+    absent = y.copy()
+    absent.iloc[0, 2:] = np.nan  # two symbols: below MIN_BREADTH, no correlation to be had
+    assert np.isnan(by_bar(absent, y).iloc[0]) and by_bar(absent, y).iloc[1:].notna().all()
+    assert np.isclose(signal(absent, y)["breadth"], 6.0), "a row without a cross-section is not counted"
+
+    empty = y.copy()
+    empty.iloc[:100] = np.nan
+    assert np.isclose(signal(empty, y)["breadth"], 6.0), "and neither are a hundred of them"
 
     # `spearman` equals pandas', including when the two series miss different rows.
     a = pd.Series(rng.normal(size=50))

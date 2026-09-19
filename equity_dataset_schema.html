@@ -605,6 +605,33 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
   </div>
   <p>Due rimedi possibili, e vanno confrontati, non scelti a priori: <strong>(i)</strong> normalizzare ogni colonna di volume contro la mediana storica <em>della stessa fascia oraria</em> — stessa aritmetica di <code>log_volume_vs_median</code> con un raggruppamento in più; <strong>(ii)</strong> lasciarle grezze e aggiungere due colonne di orario (seno e coseno della frazione di sessione trascorsa), lasciando al modello il compito di condizionare. La (ii) è meno codice e più onesta come misura; la (i) rende le colonne confrontabili fra simboli, che è ciò che serve a un'etichetta cross-sezionale. <strong>Nota di cautela:</strong> l'ora del giorno è la variabile più prevedibile del mercato, quindi un modello che la riceve produrrà una Rank IC alta contro qualunque etichetta con struttura intraday. Va controllata con una baseline a sola ora del giorno, esattamente come <code>rsi_centered</code> controlla la griglia di <code>legsweep</code>.</p>
 
+  <div class="box ok">
+    <h4>Il confronto fra i due rimedi — chiuso, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p><strong>Vince il rimedio (i), e non di poco.</strong> <code>volume_climax</code> è stato
+    calcolato in due versioni sullo stesso pannello: fondo <em>dentro</em> la sessione contro le sue
+    barre recenti, cieco alla U; e fondo <em>fra</em> sessioni contro lo storico dello stesso simbolo
+    allo stesso minuto del giorno, che della U è fatto — mediana espandente sulle sole sessioni
+    passate, quindi causale e senza bisogno della regola train-only.</p>
+    <div class="tw"><table>
+      <caption>Rank IC contro il rendimento forward market-neutral, media e dispersione sui quattro fold</caption>
+      <thead><tr><th>versione</th><th class="num">h=5</th><th class="num">h=15</th><th class="num">h=30</th><th>segno stabile</th></tr></thead>
+      <tbody>
+        <tr><td>fondo dentro la sessione</td><td class="num">+0,0025</td><td class="num">+0,0008</td><td class="num">+0,0016</td><td><strong>no, a tutti e tre</strong></td></tr>
+        <tr><td><strong>fondo stagionale</strong></td><td class="num">−0,0048</td><td class="num">−0,0059</td><td class="num">−0,0067</td><td><strong>sì, a tutti e tre</strong></td></tr>
+        <tr><td>rapporto |IC| / sd</td><td class="num">0,86 → 2,82</td><td class="num">0,40 → 2,68</td><td class="num">0,73 → 3,35</td><td></td></tr>
+      </tbody>
+    </table></div>
+    <p>La versione stagionale ha il rapporto più alto di tutta la tabella delle otto colonne
+    (<strong>3,35</strong>) e cambia anche <em>segno</em> rispetto all'altra: normalizzare per fascia
+    oraria non è una rifinitura, è ciò che separa un segnale da un artefatto della giornata.</p>
+    <p class="lead">Nota sul controllo a sola ora del giorno che questa sezione impone: <strong>è
+    degenere cross-sezionalmente</strong> e non è stato costruito. L'ora è lo stesso numero per ogni
+    simbolo in un dato istante, quindi una colonna di sola ora ha dispersione cross-sezionale nulla
+    e non può produrre Rank IC. Ciò che sopravvive della U è la parte che <em>differisce fra
+    simboli</em>, ed è esattamente quella che il confronto qui sopra misura. Il rimedio (ii) —
+    seno e coseno della frazione di sessione — è degenere per la stessa ragione.</p>
+  </div>
+
   <h3>3 · N va riscelto, e il ramo lento ha un tetto <span class="b b-msr">da rimisurare</span></h3>
   <p>La regola «N in barre, non in ore» tiene e resta il motivo per cui i rami sono complementari invece di essere copie ricampionate dello stesso. Ma nel regime intraday-only si aggiunge un vincolo che su crypto non poteva esistere: <strong>il ramo più lento, a N step, deve stare dentro una sessione</strong>. Con 6,5 ore:</p>
   <div class="tw">

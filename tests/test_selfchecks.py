@@ -21,6 +21,7 @@ MODULES = [
     "alpacatrader.metrics",
     "alpacatrader.panel",
     "alpacatrader.columns",
+    "alpacatrader.exhaustcheck",
 ]
 
 
