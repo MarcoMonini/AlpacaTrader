@@ -1,4 +1,4 @@
-"""The dashboard: historical Alpaca bars as candlesticks, one tab per symbol.
+"""The dashboard: historical Alpaca bars for one symbol, as candlesticks.
 
 The deployed artefact of the project and, for now, its whole surface: it proves the environment
 reaches the venue, that credentials and feed are wired, and that a session-aware index draws
@@ -63,10 +63,9 @@ def main() -> None:
     st.set_page_config(page_title="Alpaca Trader", layout="wide")
     st.title("Alpaca Trader")
 
-    symbols = st.sidebar.multiselect(
-        "Symbols",
+    symbol = st.sidebar.selectbox(
+        "Symbol",
         SYMBOLS,
-        default=SYMBOLS[:3],
         accept_new_options=True,
         help="a starting universe, not the one the spec settles on. Type any other US ticker to draw it.",
     )
@@ -80,22 +79,17 @@ def main() -> None:
         "different market, not an extension of this one.",
     )
 
-    if not symbols:
-        st.info("Pick at least one symbol.")
+    try:
+        df = load_candles(symbol, timeframe, days, rth)
+    except Exception as error:  # credentials, an unknown ticker, a feed the plan lacks
+        st.error(str(error))
+        return
+    if df.empty:
+        st.warning(f"Alpaca serves no {timeframe} bars for {symbol} over the last {days} days.")
         return
 
-    for symbol, tab in zip(symbols, st.tabs(symbols)):
-        with tab:
-            try:
-                df = load_candles(symbol, timeframe, days, rth)
-            except Exception as error:  # credentials, an unknown ticker, a feed the plan lacks
-                st.error(str(error))
-                continue
-            if df.empty:
-                st.warning(f"Alpaca serves no {timeframe} bars for {symbol} over the last {days} days.")
-                continue
-            st.plotly_chart(chart(df, symbol, timeframe), use_container_width=True)
-            st.caption(f"{len(df):,} bars · {df.index[0]:%Y-%m-%d %H:%M} → {df.index[-1]:%Y-%m-%d %H:%M} UTC")
+    st.plotly_chart(chart(df, symbol, timeframe), use_container_width=True)
+    st.caption(f"{len(df):,} bars · {df.index[0]:%Y-%m-%d %H:%M} → {df.index[-1]:%Y-%m-%d %H:%M} UTC")
 
 
 if __name__ == "__main__":

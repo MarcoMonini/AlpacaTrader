@@ -38,6 +38,10 @@ Two environment variables, Alpaca's own names, in `.env` (gitignored — copy `.
 `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY`. Paper-account keys are enough; nothing here places an
 order. `ALPACA_FEED` picks the feed and defaults to `iex`.
 
+They are not optional the way they were in the crypto project. That endpoint was public — it still
+answers 200 unauthenticated — while `/v2/stocks/bars` answers **401** without a key, on any feed.
+There is no anonymous read of equity data to fall back on.
+
 `alpaca-py` does *not* read those variables itself — it raises on a missing key — so
 `data.candles.client()` reads them, and reads them **lazily**. A module that touched credentials at
 import would take Streamlit down before it drew the error message that says which variable is

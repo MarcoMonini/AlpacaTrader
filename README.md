@@ -47,11 +47,12 @@ cp .env.example .env     # then put your Alpaca keys in it
 uv run streamlit run src/alpacatrader/app/dashboard.py
 ```
 
-Paper-account keys are enough — the project reads market data and places no orders. Without them
-the page still starts and says which variable is missing.
+**The keys are required.** Alpaca's crypto endpoint was public; `/v2/stocks/bars` answers 401
+without a key, on any feed. Paper-account keys are enough and free — the project reads market data
+and places no orders. Without them the page still starts and says which variable is missing.
 
-The dashboard downloads historical bars for any US ticker and draws them as candlesticks with
-volume underneath, one tab per symbol. Nights and weekends are cut out of the axis, so a 5-minute
+The dashboard downloads historical bars for the ticker picked in the sidebar and draws them as
+candlesticks with volume underneath. Nights and weekends are cut out of the axis, so a 5-minute
 chart is candles rather than five vertical strips separated by empty days.
 
 ## 🧱 Layout
