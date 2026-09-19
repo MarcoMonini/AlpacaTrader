@@ -23,11 +23,17 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
         sul train)
 - [x] **M1b** ✅ U1, 2026-09-19 — strumento per esposizione — spread effettivo → **U1** · 3 h → M1a
       ✔ tabella candidati (spread mediano ponderato RTH, esclusa prima/ultima mezz'ora) + costo bp
-      ✔ `SYMBOLS` = **venti** strumenti, ognuno col commento che dice **quale esposizione implementa**
+      ✔ `universe.U1` = venti strumenti, ognuno col commento che dice quale esposizione implementa
+      ✔ **esito: l'ipotesi Vanguard di §4 è morta** — VPU 7¢, VDC 9¢, VAW 12¢, VHT 16¢, tutti
+        sopra il loro pareggio. La colonna «pareggio» di §4 ha previsto tutte e 7 le decisioni
+      ✔ costo U1 da 0,281 bp (IWM) a 2,170 (XHB) — **7,7×**, il vettore per simbolo resta necessario
+      ⚠ XHB 2,170 · XOP 1,927 · UUP 1,899 stanno **sopra 1,76 bp**, il miglior pareggio mai misurato
       ✘ nessuno strumento accettabile in un'esposizione → si cambia strumento o la si dichiara non
         tradabile; **non** la si sostituisce con una più economica ma correlata a un'altra
 - [x] **M2** ✅ `costs.py`, fee per simbolo · 3 h → M1b *(i numeri; il codice si scrive prima)*
       ✔ il suo posto è la **simulazione**, non il dataset
+      ✔ **esito: la tabella di §2 si riproduce a 1e-3 bp**; lo scarto è l'arrotondamento della
+        tabella (somma di componenti già arrotondate), non la formula
       ✔ **esito: la tabella di §2 si riproduce a 1e-3 bp**; lo scarto è l'arrotondamento della
         tabella (somma di componenti già arrotondate), non la formula
       ✔ `0,103 + 0,975/P + 5000·s/P`; SEC §31 e TAF in config, mai costanti
