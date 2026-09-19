@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, time, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
 from alpaca.data.enums import Adjustment, DataFeed
@@ -48,7 +49,31 @@ OPEN, CLOSE = time(9, 30), time(16, 0)
 # a typed symbol too, so the list is a starting point rather than a ceiling.
 SYMBOLS = ["SPY", "QQQ", "XLK", "XLV", "XLE", "XLF", "AAPL", "MSFT", "NVDA", "AMZN"]
 
+# The repository root, from this file rather than from the working directory: the page is started
+# by an absolute path as often as not, and `.env` does not move when the caller does.
+ENV_FILE = Path(__file__).parents[3] / ".env"
+
 _client: StockHistoricalDataClient | None = None
+
+
+def load_env(path: Path = ENV_FILE) -> None:
+    """Put `KEY=value` lines from `.env` into the environment, without overwriting what is there.
+
+    Five lines instead of a dependency: this reads two secrets out of a file the developer wrote by
+    hand, and `python-dotenv`'s interpolation, export syntax and multi-line values are features
+    nothing here uses. A missing file is the normal case in a container, where the variables are
+    injected by the host.
+
+    `setdefault` and not assignment, so a variable already exported wins over the file. That is the
+    order a deployment needs — the image carries no `.env` and the host's variables must not be
+    shadowed by a stale one that got copied in by mistake.
+    """
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        key, sep, value = line.partition("=")
+        if sep and not key.lstrip().startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip())
 
 
 def client() -> StockHistoricalDataClient:
@@ -60,6 +85,7 @@ def client() -> StockHistoricalDataClient:
     """
     global _client
     if _client is None:
+        load_env()
         key, secret = os.environ.get("APCA_API_KEY_ID"), os.environ.get("APCA_API_SECRET_KEY")
         if not (key and secret):
             raise RuntimeError("Set APCA_API_KEY_ID and APCA_API_SECRET_KEY — see .env.example.")
@@ -132,6 +158,21 @@ def _selfcheck() -> None:
     # Half-days need no rule of their own: nothing prints after the early close, so nothing is cut.
     early = pd.date_range("2025-07-03 13:30", "2025-07-03 17:00", freq="1min", tz="UTC")
     assert len(regular_hours(pd.DataFrame({"close": 1.0}, index=early))) == len(early)
+
+    # `.env` parsing, on a file written here rather than on the developer's own.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        env = Path(tmp) / ".env"
+        env.write_text("# a comment\nAPCA_TEST_KEY=abc\nAPCA_TEST_TAKEN = already \nblank line\n")
+        os.environ["APCA_TEST_TAKEN"] = "exported"
+        try:
+            load_env(env)
+            assert os.environ["APCA_TEST_KEY"] == "abc", "a key=value line reaches the environment"
+            assert os.environ["APCA_TEST_TAKEN"] == "exported", "and an exported variable wins over the file"
+        finally:
+            del os.environ["APCA_TEST_KEY"], os.environ["APCA_TEST_TAKEN"]
+    load_env(Path(tmp) / "absent")  # a missing file is the container's normal case, not an error
 
     assert not os.environ.get("APCA_API_KEY_ID") or client(), "credentials, when present, build a client"
 
