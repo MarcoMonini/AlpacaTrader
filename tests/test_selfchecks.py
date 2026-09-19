@@ -9,7 +9,7 @@ import importlib
 
 import pytest
 
-MODULES = ["alpacatrader.data.candles", "alpacatrader.universe"]
+MODULES = ["alpacatrader.data.candles", "alpacatrader.universe", "alpacatrader.costs"]
 
 
 @pytest.mark.parametrize("name", MODULES)
