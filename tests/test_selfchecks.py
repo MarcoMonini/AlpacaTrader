@@ -18,6 +18,7 @@ MODULES = [
     "alpacatrader.data.store",
     "alpacatrader.calendar",
     "alpacatrader.session",
+    "alpacatrader.metrics",
 ]
 
 
