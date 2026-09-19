@@ -98,41 +98,71 @@ def find(close: pd.Series, session: np.ndarray, window: int) -> pd.DataFrame:
     return pd.DataFrame({"row": keep_arr, "kind": kind[keep_arr], "price": values[keep_arr]})
 
 
-def run(close: pd.Series, session: np.ndarray, window: int, fee: float, lag: int = 0) -> dict:
-    """Net log P&L a year of the hindsight trader on one symbol, long-only, one leg at a time.
+def legs(close: pd.Series, session: np.ndarray, window: int, fee: float, lag: int = 0) -> pd.DataFrame:
+    """Every trade the hindsight reader would take, one row each — what `run` totals and the page draws.
 
-    `lag` fills `lag` bars after the pivot instead of on it. Both fills shift by the same lag, so
-    the exit still follows the entry — but when two pivots sit closer together than `lag` the entry
-    lands past the exit pivot and the trade no longer overlaps the leg at all. A model that detected
-    the low that late would not take the trade, so neither does the oracle.
+    One implementation, so a chart cannot show a different set of trades from the one a measurement
+    counts. `lag` fills that many bars after the pivot instead of on it. Both fills shift by the same
+    lag, so the exit still follows the entry — but when two pivots sit closer together than `lag` the
+    entry lands past the exit pivot and the trade no longer overlaps the leg at all. A model that
+    detected the low that late would not take it, so neither does the oracle; those rows come back
+    marked `skipped`.
+
+    `crosses` marks a leg that spans a close. It is reported and never traded: in the intraday-only
+    regime the book is flat at 16:00, and the gap such a leg carries is the untradable content §5
+    exists to remove.
     """
     piv = find(close, session, window)
     if len(piv) < 2:
-        return {"trades": 0, "log_per_year": 0.0, "crossing": 0, "skipped": 0, "median_bars": np.nan}
+        return pd.DataFrame(columns=["entry", "exit", "buy", "sell", "gross", "net", "bars", "crosses", "skipped"])
     rows, kind, values = piv.row.to_numpy(), piv.kind.to_numpy(), close.to_numpy()
     filled = rows + lag
-    ok = filled < len(close)
-    rows, kind, filled = rows[ok], kind[ok], filled[ok]
+    inside = filled < len(close)
+    rows, kind, filled = rows[inside], kind[inside], filled[inside]
 
-    opens = (kind[:-1] == -1) & (filled[:-1] < rows[1:])
-    skipped = int(((kind[:-1] == -1) & ~(filled[:-1] < rows[1:])).sum())
-    entry, exit_ = filled[:-1][opens], filled[1:][opens]
-    # Intraday-only: a leg that crosses the bell cannot be held, and the gap it carries is exactly
-    # the untradable content the regime was chosen to exclude.
-    same = session[entry] == session[exit_]
-    crossing = int((~same).sum())
-    entry, exit_ = entry[same], exit_[same]
-    if len(entry) == 0:
-        return {"trades": 0, "log_per_year": 0.0, "crossing": crossing, "skipped": skipped, "median_bars": np.nan}
+    lows = kind[:-1] == -1
+    late = ~(filled[:-1] < rows[1:])
+    entry, exit_ = filled[:-1], filled[1:]
+    out = pd.DataFrame(
+        {
+            "entry": entry[lows],
+            "exit": exit_[lows],
+            "buy": values[entry[lows]],
+            "sell": values[exit_[lows]],
+            "bars": exit_[lows] - entry[lows],
+            "crosses": session[entry[lows]] != session[exit_[lows]],
+            "skipped": late[lows],
+        }
+    )
+    out["gross"] = out.sell / out.buy - 1
+    out["net"] = (out.sell / out.buy) * (1 - fee) ** 2 - 1
+    return out
 
-    legs = (values[exit_] / values[entry]) * (1 - fee) ** 2 - 1
+
+def tradable(out: pd.DataFrame) -> pd.DataFrame:
+    """The legs an intraday-only book could actually have held."""
+    return out[~out.crosses & ~out.skipped] if len(out) else out
+
+
+def run(close: pd.Series, session: np.ndarray, window: int, fee: float, lag: int = 0) -> dict:
+    """Net log P&L a year of the hindsight trader on one symbol, long-only, one leg at a time."""
+    out = legs(close, session, window, fee, lag)
+    took = tradable(out)
+    if not len(took):
+        return {
+            "trades": 0,
+            "log_per_year": 0.0,
+            "crossing": int(out.crosses.sum()) if len(out) else 0,
+            "skipped": int(out.skipped.sum()) if len(out) else 0,
+            "median_bars": np.nan,
+        }
     years = len(np.unique(session)) / SESSIONS_PER_YEAR
     return {
-        "trades": len(legs),
-        "log_per_year": float(np.log1p(legs).sum() / years),
-        "crossing": crossing,
-        "skipped": skipped,
-        "median_bars": float(np.median(exit_ - entry)),
+        "trades": len(took),
+        "log_per_year": float(np.log1p(took.net).sum() / years),
+        "crossing": int(out.crosses.sum()),
+        "skipped": int(out.skipped.sum()),
+        "median_bars": float(took.bars.median()),
     }
 
 

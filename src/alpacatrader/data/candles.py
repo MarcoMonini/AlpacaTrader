@@ -47,6 +47,9 @@ from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 TIMEFRAMES = {
     "1m": TimeFrame(1, TimeFrameUnit.Minute),
+    # 3m is the research grid, chosen in M4. It is here so the page can draw exactly what the
+    # measurements are taken on rather than something adjacent to it.
+    "3m": TimeFrame(3, TimeFrameUnit.Minute),
     "5m": TimeFrame(5, TimeFrameUnit.Minute),
     "15m": TimeFrame(15, TimeFrameUnit.Minute),
     "1h": TimeFrame(1, TimeFrameUnit.Hour),
