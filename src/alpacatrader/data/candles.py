@@ -10,8 +10,21 @@ feed is paid — so there is no reason to train on anything else. IEX is ~2-3% o
 at 2024-06-03 14:30 reads v=577 / n=14 against SIP's v=75,038 / n=2,495) and its daily history
 starts in 2018 with gaps, which is what made the first run of `universe` unusable.
 
-Bars come back split- and dividend-adjusted (`adjustment=all`) and indexed by the *open* time of
-the bar in UTC, which is the alignment rule everything downstream depends on.
+Bars come back **split-adjusted only** (`adjustment=split`) and indexed by the *open* time of the
+bar in UTC, which is the alignment rule everything downstream depends on.
+
+The split adjustment is not negotiable: an uncorrected 2:1 prints a −50% log return that the pivots
+read as a leg and the label as an opportunity. The dividend adjustment is deliberately *off*, which
+departs from §3's stated parameter while serving the design §3 states — "splits into the series,
+dividends into the cost". Measured 2026-09-19: XLU has never split, and `adjustment=all` still
+rewrites its 2016 close from $43.19 to $31.22, a factor of 0.723, because ten years of dividends are
+discounted backwards. An ETF pays quarterly, so `all` rewrites the whole history of every symbol
+four times a year and no measurement taken on it reproduces months later. With `split` the store
+moves only on a real split, which is rare and visible.
+
+What it costs: the ex-date prints a drop that is not a move. In the intraday-only regime of §7 that
+drop lands at the open, inside the overnight gap every return already discards — so in this regime
+it costs nothing. It would cost something again the day the book holds overnight.
 
 **No gapless grid here, unlike the crypto project.** There, a period with no trade got a synthetic
 flat bar because the market never closes. An equity session does: between the 15:55 bar and the
@@ -124,7 +137,7 @@ def bars(symbol: str, timeframe: str, start, end=None, rth: bool = True) -> pd.D
                 timeframe=TIMEFRAMES[timeframe],
                 start=start,
                 end=end,
-                adjustment=Adjustment.ALL,
+                adjustment=Adjustment.SPLIT,
                 feed=DataFeed(os.environ.get("ALPACA_FEED", "sip")),
             )
         )

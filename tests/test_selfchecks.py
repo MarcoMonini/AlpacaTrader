@@ -15,6 +15,8 @@ MODULES = [
     "alpacatrader.universe",
     "alpacatrader.costs",
     "alpacatrader.dispersion",
+    "alpacatrader.data.store",
+    "alpacatrader.calendar",
 ]
 
 
