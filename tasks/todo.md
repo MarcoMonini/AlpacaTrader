@@ -4,12 +4,14 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
 
 ## Fase A — nessuno store, nessun training
 
-- [ ] **M0** `legcheck` sulla cella argmax (0,2 / 12) — *nel repo TradingVision* · 5 min
+- [x] **M0** `legcheck` sulla cella argmax (0,2 / 12) — **chiusa in negativo 2026-09-19** — *nel repo TradingVision* · 5 min
       ↳ `legsweep` ha spazzato 117 celle dei due numeri liberi dell'etichetta; la superficie non ha
         ottimo interno e alla cella migliore `edge` è 0,0330 contro 0,0298 — tre semi di rumore.
         M0 chiede al **prezzo** se quel vincitore è vero
       ✔ decili quotati contro il prezzo con |t|; verdetto scritto in §5
-      ✘ decile piatto → la griglia non aveva un vincitore. **Non si rifà sulla Rank IC**
+      ✔ **esito: piatta.** ic_raw −0,0194 a 6 barre, max |t| = 1,68 su 30 decili, nessuna
+        monotonia. Rank IC 0,4753 contro l'etichetta. Verdetto in §5 dello schema
+      ✘ la griglia non aveva un vincitore. **Non si rifà sulla Rank IC**
 - [ ] **M1a** **esposizioni scorrelate → `E1`** · 3 h · *il costo non entra qui*
       ↳ il dataset decide cosa il modello può imparare; il costo decide con quale strumento lo si
         compra (M1b) e quanto costa simularlo (M2)

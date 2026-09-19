@@ -451,6 +451,31 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <li><strong>δ della Huber</strong> — mediana di <code>|target|</code> sul solo train. Cambia con l'etichetta e quindi con l'asset class. 2,1 non ha significato qui.</li>
     <li><strong>Orizzonte di purging</strong> — la distanza al pivot successivo, misurata p50 28 / p95 124 / p99 202 / max 754 barre su crypto. Va rimisurata in barre di sessione, e il massimo è il numero che conta perché il purging è esatto.</li>
   </ul>
+
+  <div class="box ok">
+    <h4>Misura 0 — chiusa in negativo, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p>La cella argmax della griglia (<code>smoothing</code> 0,20, <code>window</code> 12) quotata
+    contro il <strong>prezzo</strong> con <code>legcheck</code>, sul suo stesso slice di test —
+    54.931 righe, 20 simboli, 2025-06-01 → 2026-09-02, breadth 19,95. Rank IC contro l'etichetta
+    riprodotta a 0,4753, identica a quella registrata da <code>legsweep</code>: è la cella giusta.</p>
+    <div class="tw"><table>
+      <caption>rendimento forward market-neutral per decile di predizione — nessun decile
+      raggiunge |t| &gt; 2, nessuna monotonia</caption>
+      <thead><tr><th>orizzonte</th><th class="num">ic_raw</th><th class="num">ic_residual</th>
+      <th class="num">decile 0, t</th><th class="num">decile 9, t</th><th class="num">max |t|</th></tr></thead>
+      <tbody>
+        <tr><td>6 barre</td><td class="num">−0,0194</td><td class="num">−0,0214</td><td class="num">−0,59</td><td class="num">−0,05</td><td class="num">1,68</td></tr>
+        <tr><td>24 barre</td><td class="num">−0,0060</td><td class="num">−0,0095</td><td class="num">−1,51</td><td class="num">−0,52</td><td class="num">1,54</td></tr>
+        <tr><td>72 barre</td><td class="num">+0,0080</td><td class="num">+0,0049</td><td class="num">−0,95</td><td class="num">+0,97</td><td class="num">0,97</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Verdetto: la griglia non aveva un vincitore.</strong> 0,4753 contro l'etichetta è
+    −0,0194 contro il prezzo a 6 barre — lo stesso schema del 0,4114 → −0,0405 già a verbale, e
+    quello che la colonna <code>edge</code> (0,0330 contro 0,0298, tre semi di rumore) già
+    suggeriva. La griglia <strong>non va rifatta sulla Rank IC</strong>: riprodurrebbe lo stesso
+    non-risultato a un costo di 117 addestramenti. <code>peso_tempo</code> e
+    <code>finestra_estremi</code> restano da rimisurare su equity con giudice il prezzo (misura 6).</p>
+  </div>
 </section>
 
 <!-- ============================================================ 6 -->
