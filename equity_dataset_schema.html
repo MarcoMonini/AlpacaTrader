@@ -789,6 +789,61 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     </table>
   </div>
 
+  <div class="box ok">
+    <h4>Misura 5 — chiusa, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p>Nessun addestramento. Otto colonne causali contro il rendimento forward market-neutral, e il
+    libro dollar-neutral sul quinto superiore e inferiore della cross-section, piatto a ogni chiusura,
+    con il vettore di costo per simbolo di §2.</p>
+    <div class="tw"><table>
+      <caption>libro a θ=0,2, 2.693 sessioni, 500 rotazioni per riga — log per anno</caption>
+      <thead><tr><th>colonna</th><th class="num">lordo</th><th class="num">null</th><th class="num">z</th>
+      <th class="num">costo</th><th class="num">netto</th><th class="num">turnover/anno</th></tr></thead>
+      <tbody>
+        <tr><td><strong>stretch</strong></td><td class="num"><strong>+0,5601</strong></td><td class="num">−0,0001 ± 0,0198</td><td class="num"><strong>28,24</strong></td><td class="num">2,6451</td><td class="num"><strong>−2,0851</strong></td><td class="num">27.907</td></tr>
+        <tr><td>stretch, segno invertito</td><td class="num">−0,5472</td><td class="num">+0,0022 ± 0,0206</td><td class="num">−26,68</td><td class="num">2,6438</td><td class="num">−3,1910</td><td class="num">27.883</td></tr>
+        <tr><td><strong>streak</strong></td><td class="num">+0,5192</td><td class="num">−0,0007 ± 0,0215</td><td class="num">24,20</td><td class="num">4,9055</td><td class="num">−4,3863</td><td class="num">49.551</td></tr>
+        <tr><td>composite</td><td class="num">+0,0372</td><td class="num">+0,0113 ± 0,0135</td><td class="num">1,92</td><td class="num">1,0554</td><td class="num">−1,0182</td><td class="num">11.564</td></tr>
+        <tr><td>volume_climax_seasonal</td><td class="num">+0,0227</td><td class="num">−0,0004 ± 0,0203</td><td class="num">1,13</td><td class="num">4,8358</td><td class="num">−4,8131</td><td class="num">50.464</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Lo sbarramento di §10 passa, e non di poco.</strong> «Lordo ≤ 0 contro
+    <code>rotation_null</code> → nessun lavoro di modello lo salva»: il lordo di <code>stretch</code>
+    è +0,56 log l'anno contro un null di −0,0001 ± 0,0198, <strong>z = 28,2</strong>. Ruotate a fase
+    casuale, le stesse posizioni guadagnano zero. Sul venue precedente lo stesso test leggeva
+    z = −0,06: <strong>questo è l'opposto di quel risultato</strong>. Il controllo di simmetria tiene
+    — invertendo il segno il lordo è −0,5472, uno specchio quasi esatto.</p>
+    <div class="box no" style="margin-top:14px">
+      <h4>Il criterio 3 di §9 fallisce, e il numero dice dove</h4>
+      <div class="tw"><table>
+        <thead><tr><th>regola</th><th class="num">bp pagati</th><th class="num">bp di pareggio</th><th class="num">fattore</th></tr></thead>
+        <tbody>
+          <tr><td>stretch</td><td class="num">0,948</td><td class="num"><strong>0,201</strong></td><td class="num">4,7×</td></tr>
+          <tr><td>streak</td><td class="num">0,990</td><td class="num">0,105</td><td class="num">9,4×</td></tr>
+          <tr><td>composite</td><td class="num">0,913</td><td class="num">0,032</td><td class="num">28,4×</td></tr>
+        </tbody>
+      </table></div>
+      <p>Il costo per lato più basso di U1 è <strong>IWM a 0,281 bp</strong>; la regola su
+      <code>stretch</code> pareggia a <strong>0,201 bp</strong>. Operando <em>solo</em> lo strumento
+      più economico del paniere, questa regola perderebbe comunque. Non è un problema di venue — è
+      già il venue scelto perché costa 15–150 volte meno — è un problema di <strong>frequenza</strong>:
+      27.907 unità di peso l'anno, ~10,4 rotazioni a sessione su un libro che ne paga 8 di
+      obbligatorie. Il pareggio richiede <strong>un quinto del turnover a parità di lordo</strong>,
+      da 10,4 a 2,2 per sessione.</p>
+      <p>È l'avvertimento di §2 verificato sul campo: <em>«con la commissione a zero la curva di costo
+      diventa piatta nel numero di trade — e questo invita ad aumentare la frequenza. È l'inferenza
+      sbagliata»</em>. Ed è la stessa forma del risultato di <code>factor</code> sul crypto: la
+      finestra a 24 barre ribilanciava 173 volte l'anno e perdeva, la stessa a 2880 ne faceva 2,3 e
+      pagava. <strong>Il lordo esiste; il problema è raccoglierlo.</strong></p>
+    </div>
+    <p><strong>Ottimismo dichiarato:</strong> il libro opera alla chiusura della barra il cui close ha
+    appena letto. A tre minuti è ragionevole, ma §2 ricorda che l'esecuzione è REST verso un
+    wholesaler — lo slippage vero è la misura 10 e va sottratto da un netto già negativo.</p>
+    <p><strong>Adattamenti della rotazione a tempo di sessione:</strong> il roll avviene dentro le
+    sole righe tradabili (un roll su tutte depositerebbe posizioni su barre dove il libro deve essere
+    piatto, e il null terrebbe esposizione che la regola non può tenere), e ogni simbolo ha il proprio
+    sfasamento, perché un null che li ruotasse insieme resterebbe un libro coerente, solo in ritardo.</p>
+  </div>
+
   <h3>Il criterio di promozione, dichiarato prima di guardare qualunque output <span class="b b-ok">riusabile, rafforzato</span></h3>
   <p>Il documento precedente promuoveva sulla Rank ICIR contro l'etichetta e ha pagato quella scelta con due anni di misure su una quantità che non era il prezzo. Qui il criterio è, in ordine, e ogni riga è una condizione di sbarramento:</p>
   <ol>

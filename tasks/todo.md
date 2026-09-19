@@ -80,11 +80,15 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
 
 ## Fase C — il go/no-go
 
-- [ ] **M5** `exhaustcheck --price` + baseline `factor` su U1, costo vero, **nessun training** · 1 h
+- [x] **M5** ✅ **2026-09-19** — `exhaustcheck` + libro contro `rotation_null`, **nessun training**
       → M2, M4
       ✔ controllo a **esposizione fissa** (`rotation_null`), mai buy-and-hold
-      ✘ lordo ≤ 0 contro `rotation_null` → **nessun modello lo salva**. Fine del progetto
-- [ ] **Checkpoint C** — **go/no-go**
+      ✔ **lordo +0,5601 contro null −0,0001 ± 0,0198, z = 28,2** — lo sbarramento passa
+      ✔ simmetria: segno invertito dà −0,5472, specchio quasi esatto
+      ⚠ **netto −2,0851**: pareggio a 0,201 bp contro 0,281 del nome più economico di U1
+      ⚠ serve **un quinto del turnover** a parità di lordo — da 10,4 a 2,2 rotazioni/sessione
+- [x] **Checkpoint C** ✅ **go** — il lordo esiste e batte il null; il problema è raccoglierlo
+- [ ] **M5b** finestra e frequenza di decisione: su quale scala il segnale paga · → M5
 
 ## Fase D — etichetta, leakage, riferimento
 

@@ -22,6 +22,7 @@ MODULES = [
     "alpacatrader.panel",
     "alpacatrader.columns",
     "alpacatrader.exhaustcheck",
+    "alpacatrader.rule",
 ]
 
 
