@@ -42,9 +42,21 @@ from alpacatrader.data.candles import EXCHANGE, bars
 STORE = Path(__file__).parents[3] / "data"
 START = "2016-01-04"  # the floor of Alpaca's history; a younger symbol simply starts later
 BASE = "1m"
-# Fetched a quarter at a time: a year of twenty symbols across extended hours is millions of rows
-# in one response, and a failure halfway through a year costs a year.
-CHUNK = "QE"
+# Fetched a **month** at a time, and the month is not about size. Measured 2026-09-19, and this is
+# the trap §3 asked to look for — the one that breaks silently:
+#
+#   2019-03-31 -> 2019-04-10   first bar 2019-04-01   correct
+#   2019-03-31 -> 2019-05-04   first bar 2019-04-01   correct
+#   2019-03-31 -> 2019-06-30   first bar 2019-05-06   April silently gone
+#   2019-04-01 -> 2019-06-30   first bar 2019-05-06   April silently gone
+#
+# The range the endpoint returns depends on the `end` asked for: widen the window and a leading
+# stretch disappears, with no error, no warning and a perfectly ordinary `next_page_token`. A
+# quarterly build cost JNK 24 sessions of April 2019 and nothing in the response said so.
+#
+# Monthly chunks make the failure much less likely and `verify` makes it visible either way. The
+# store is not trusted because the fetch looks right; it is trusted because the sessions are counted.
+CHUNK = "ME"
 
 
 def path(symbol: str, interval: str = BASE) -> Path:
@@ -113,6 +125,83 @@ def build(symbols: list[str], start: str = START, end: str | None = None, force:
         rows.append({"symbol": symbol, "rows": new["rows"], "status": status, **_span(new)})
         print(f"  {symbol:5} {new['rows']:>9,} bars  {new['first'][:10]} -> {new['last'][:10]}  [{status}]")
     return pd.DataFrame(rows)
+
+
+def verify(symbols: list[str], calendar=None) -> pd.DataFrame:
+    """Sessions each symbol should have and does not, against the market calendar.
+
+    The reference is the consensus calendar of the store itself: a session is one most of the basket
+    traded. Circular only in appearance — a stretch missing from *one* symbol is exactly what this
+    catches, and a stretch missing from all of them shows up as a session count that does not match
+    the ~252 a year the exchange runs. Measured: 2,693 sessions over 10.7 years, which does.
+    """
+    from alpacatrader.calendar import consensus, sessions
+
+    per = {s: sessions(pd.read_parquet(path(s)).index) for s in symbols if read_stamp(s)}
+    days = calendar if calendar is not None else consensus(list(per.values()))
+    rows = []
+    for symbol, frame in per.items():
+        gaps = days.index.difference(frame.index)
+        gaps = gaps[gaps >= frame.index.min()]  # history before a symbol existed is not a gap
+        rows.append(
+            {
+                "symbol": symbol,
+                "sessions": len(frame),
+                "missing": len(gaps),
+                "from": str(gaps.min().date()) if len(gaps) else "",
+                "to": str(gaps.max().date()) if len(gaps) else "",
+            }
+        )
+    return pd.DataFrame(rows).sort_values("missing", ascending=False)
+
+
+def repair(symbols: list[str]) -> pd.DataFrame:
+    """Re-fetch the sessions `verify` found missing, **one session at a time**, and merge them in.
+
+    A session-wide window and not a month, because the width of the window is the bug: JNK's April
+    2019 comes back when April alone is asked for and vanishes inside a quarter, and its first three
+    days of May vanish inside a month too. The narrowest window that can hold the answer is the only
+    one that reliably does, and a few dozen extra requests are cheaper than a hole nobody sees.
+    """
+    rows = []
+    for row in verify(symbols).itertuples():
+        if not row.missing:
+            continue
+        frame = pd.read_parquet(path(row.symbol))
+        before = len(frame)
+        gaps = _gaps(row.symbol, frame)
+        pieces = [frame]
+        for day in gaps:
+            piece = bars(row.symbol, BASE, day, day + pd.Timedelta(days=1))
+            if not piece.empty:
+                pieces.append(piece)
+        frame = pd.concat(pieces)
+        frame = frame[~frame.index.duplicated(keep="first")].sort_index()
+        old_stamp = read_stamp(row.symbol)
+        frame.to_parquet(path(row.symbol))
+        new_stamp = stamp_of(frame, old_stamp["start"], old_stamp["end"])
+        path(row.symbol).with_suffix(".json").write_text(json.dumps(new_stamp, indent=2))
+        rows.append(
+            {
+                "symbol": row.symbol,
+                "sessions_missing": row.missing,
+                "before": before,
+                "after": len(frame),
+                "added": len(frame) - before,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _gaps(symbol: str, frame: pd.DataFrame) -> pd.DatetimeIndex:
+    """The sessions the market had and this symbol does not."""
+    from alpacatrader.calendar import consensus, sessions
+    from alpacatrader.universe import U1
+
+    per = [sessions(pd.read_parquet(path(s)).index) for s in U1.values() if read_stamp(s)]
+    mine = sessions(frame.index)
+    gaps = consensus(per).index.difference(mine.index)
+    return gaps[gaps >= mine.index.min()]
 
 
 def _span(stamp: dict) -> dict:
@@ -197,6 +286,11 @@ if __name__ == "__main__":
 
     if "--build" in sys.argv:
         print(build(list(U1.values())).to_string(index=False))
+    elif "--verify" in sys.argv:
+        print(verify(list(U1.values())).to_string(index=False))
+    elif "--repair" in sys.argv:
+        out = repair(list(U1.values()))
+        print(out.to_string(index=False) if len(out) else "nothing missing")
     elif "--check" in sys.argv:
         print(pd.DataFrame([{"symbol": s, **(read_stamp(s) or {})} for s in U1.values()]).to_string(index=False))
     else:

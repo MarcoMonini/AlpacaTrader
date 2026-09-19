@@ -301,6 +301,61 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
   <div class="box open">
     <h4>La trappola che questa sezione deve ancora verificare <span class="b b-open">aperto</span></h4>
     <p>Il documento precedente elencava due trappole nei dump Binance — <code>open_time</code> passato da millisecondi a microsecondi senza marcatore di versione, e file con riga di header — trovate solo costruendo lo store. Le trappole equivalenti su Alpaca non sono ancora note. Le tre da controllare per prime, perché rompono in silenzio: il fuso del timestamp restituito (UTC contro ET) attraverso i due cambi DST annuali; il comportamento sulle mezze giornate di borsa; e se la retroattività di <code>adjustment=all</code> riscrive le barre storiche a ogni nuovo split, il che renderebbe lo store non riproducibile e lo stamp della cache incapace di accorgersene.</p>
+
+  <div class="box ok">
+    <h4>Misura 3 — store costruito, e le tre trappole hanno risposta <span class="b b-msr">misurato</span></h4>
+    <p>20 simboli, <strong>2.693 sessioni</strong>, 2016-01-04 → 2026-09-18, 1m nativo, SIP, RTH.
+    Circa 20,9 milioni di barre, 531 MB. Un file per simbolo: 5m e 15m si ricavano leggendo, perché
+    un file 5m su disco è una seconda copia che può sfasarsi rispetto al padre.</p>
+    <p><strong>Trappola 1 — fuso e DST: nessuna sorpresa.</strong> La sessione apre alle 09:30
+    locali in tutte e 2.693 le sessioni; in UTC alterna 13:30 e 14:30 e si è spostata
+    <strong>21 volte</strong> in 10,7 anni, cioè due volte l'anno. Confrontare sull'orologio della
+    borsa e non su un offset è sufficiente, ed è ciò che <code>regular_hours</code> fa.</p>
+    <p><strong>Trappola 2 — mezze giornate: diversa da come era scritta.</strong> Una mezza giornata
+    <em>non</em> si ferma alle 13:00. Il nastro SIP porta stampe tardive e fuori sequenza per ore:
+    il 25-11-2016 chiude alle 13:00 e ha l'ultima barra alle <strong>15:35</strong>, il 3-07-2018
+    alle 15:22. Rilevarle dall'orario di chiusura le manca tutte. La regola misura invece quanto è
+    <em>affollato il pomeriggio</em>: 21 mezze giornate, 2,0 l'anno, mediana 214 barre di cui 4 dopo
+    le 13:00, contro 390 barre e 180 di una sessione piena. <strong>Il calendario va preso a
+    maggioranza fra i simboli</strong>: sull'unione degli indici le stampe tardive di venti simboli
+    si sommano e ne fanno trovare 8 invece di 21.</p>
+    <p><strong>Trappola 3 — retroattività: peggio del previsto, e ha cambiato un parametro.</strong>
+    XLU non ha <em>mai</em> fatto split, e <code>adjustment=all</code> riscrive comunque la sua
+    chiusura del 4-01-2016 da <strong>$43,19 a $31,22</strong> — dieci anni di dividendi scontati
+    all'indietro. Un ETF stacca trimestralmente, quindi <code>all</code> riscrive tutto lo storico
+    di ogni simbolo quattro volte l'anno e nessuna misura presa su quello store si riproduce a mesi
+    di distanza. Lo store è costruito <code>adjustment=split</code>: gli split restano corretti — la
+    metà non negoziabile — e i dividendi escono dalla serie per entrare in <code>costs</code> sulla
+    sola gamba corta, che è il disegno dichiarato in questa stessa sezione. Costo: l'ex-date stampa
+    un salto che non è un movimento, e nel regime intraday-only cade dentro il gap notturno che ogni
+    rendimento già scarta. Tornerebbe a costare il giorno in cui il libro tenesse overnight.</p>
+    <div class="box no" style="margin-top:14px">
+      <h4>La trappola che nessuno cercava, e che rompe in silenzio</h4>
+      <p><strong>L'intervallo che l'endpoint restituisce dipende dalla fine richiesta.</strong>
+      Misurato su JNK:</p>
+      <div class="tw"><table>
+        <thead><tr><th>richiesta</th><th>prima barra</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><code>2019-03-31 → 2019-04-10</code></td><td>2019-04-01</td><td>corretta</td></tr>
+          <tr><td><code>2019-03-31 → 2019-05-04</code></td><td>2019-04-01</td><td>corretta</td></tr>
+          <tr><td><code>2019-03-31 → 2019-06-30</code></td><td><strong>2019-05-06</strong></td><td>aprile sparito</td></tr>
+          <tr><td><code>2019-04-01 → 2019-06-30</code></td><td><strong>2019-05-06</strong></td><td>aprile sparito</td></tr>
+        </tbody>
+      </table></div>
+      <p>Allargando la finestra un tratto iniziale scompare: nessun errore, nessun avviso, un
+      <code>next_page_token</code> del tutto normale. Una build a trimestri è costata a JNK
+      <strong>24 sessioni di aprile 2019</strong> e nulla nella risposta lo diceva. I chunk sono
+      passati a mensili, e <code>verify</code> conta le sessioni di ogni simbolo contro il
+      calendario di consenso: <strong>lo store non si considera buono perché il fetch sembra
+      giusto, ma perché le sessioni tornano</strong>. Dopo <code>repair</code> — che rifà le
+      sessioni mancanti <em>una per una</em>, perché anche la finestra mensile perdeva il 1–3
+      maggio — tutti e venti i simboli sono a zero mancanti.</p>
+    </div>
+    <p>Restano 7 sessioni su 2.693 sotto il 98% delle barre attese, e non sono buchi: 2020-03-09,
+    03-12, 03-16 e 03-18 a 376 barre sono i <strong>circuit breaker</strong> del COVID, quattordici
+    minuti di sospensione a mercato intero. Più 102 giorni feriali senza sessione, 9,5 l'anno, che
+    sono i festivi NYSE.</p>
+  </div>
   </div>
 </section>
 

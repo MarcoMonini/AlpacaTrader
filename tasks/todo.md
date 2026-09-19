@@ -45,11 +45,17 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
 ## Fase B — store e tempo di sessione
 
 - [x] **M3a** ✅ *anticipata: IEX daily parte dal 2018 con buchi, M1a non era misurabile* — `ALPACA_FEED` default **`sip`** (misurato: gratuito, dal 2016) · 5 min
-- [ ] **M3** `data.alpaca_equities` + `calendar` (NYSE) · 4 h → M1b
+- [x] **M3** ✅ **2026-09-19** — `data.store` + `calendar` (NYSE) · → M1b
       ✔ `feed=sip`, `adjustment=all`, base **1Min**, RTH esplicita, dal 2016-01-04
       ✔ stamp della cache che rifiuta parametri diversi
-      ✔ le **tre trappole** hanno una risposta misurata nel docstring: DST (UTC vs ET),
-        mezze giornate, retroattività di `adjustment=all`
+      ✔ **2.693 sessioni, 2016-01-04 → 2026-09-18, ~20,9M barre, 531 MB, 20/20 simboli completi**
+      ✔ trappola 1 (DST): apertura 09:30 locali sempre, UTC spostata 21 volte — nessuna sorpresa
+      ✔ trappola 2 (mezze giornate): **non** si fermano alle 13:00, il nastro stampa fino alle 15:59.
+        Rilevate dal pomeriggio vuoto e **a maggioranza fra simboli**: 21, cioè 2,0/anno
+      ✔ trappola 3 (retroattività): **ha cambiato un parametro** — `adjustment=split`, non `all`
+      ⚠ **trappola nuova**: l'intervallo restituito dipende dalla fine richiesta. Chunk mensili +
+        `verify` che conta le sessioni. JNK aveva perso 24 sessioni senza alcun errore
+      ✔ 7 sessioni corte su 2.693, di cui 4 sono i circuit breaker del marzo 2020
 - [x] **M3.5** ✅ **passata 2026-09-19** — dispersione `sd_t` · presa **prima della M3**
       ↳ non è un doppione di M1a: quella è progetto su rendimenti daily, questa è validazione alla
         frequenza di trading, dove il fattore comune domina di più. Un E1 buono può fallire qui
