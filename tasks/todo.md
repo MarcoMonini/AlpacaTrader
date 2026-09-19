@@ -101,8 +101,15 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
       ✔ miglior configurazione ammessa: finestra 20, stride 1, θ=0,40 → rapporto **0,260**,
         pareggio **0,243 bp** contro 0,281 (IWM) e 0,730 (mediana U1)
       ⚠ **restano 3,85×.** Due leve su quattro peggiorano; le due che aiutano danno insieme +23%
-- [ ] **M6** con una domanda in più: `stretch` è un ordinamento che si rinnova a ogni barra, non un
-      fattore da tenere. Serve un segnale con **emivita più lunga**, ed è quello che l'oracolo cerca
+- [x] **M6** ✅ **2026-09-19** — `oracle`, le due letture e la validazione di W
+      ✘ **W=15 squalificata**: soffitto causale 0,0028 log/anno. Da W=20 in su è **negativo**
+      ✘ **il criterio del ritardo è degenere qui**, e §5 «si riusa integralmente» è **sbagliato**:
+        stesse serie, fee equity → argmax W=2; fee crypto 25 bp → argmax W=24. Sceglieva la fee
+      ✔ vincolo indipendente: a W=15 il **43%** delle gambe scavalca la campana, a W=30 l'87%
+      ✔ **il soffitto c'è**: +0,3071 a W=5, +0,7114 a W=2, già al netto delle commissioni vere
+      ⚠ M5 netta −1,60 contro un soffitto di +0,31: **il divario è il segnale, non il venue**
+- [ ] **M6b** scegliere W con un criterio che qui abbia contenuto (l'oracolo non ce l'ha):
+      `crossing_pct`, R² con l'orologio, e il turnover che la regola può permettersi
 
 ## Fase D — etichetta, leakage, riferimento
 

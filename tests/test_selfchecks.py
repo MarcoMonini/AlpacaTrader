@@ -23,6 +23,7 @@ MODULES = [
     "alpacatrader.columns",
     "alpacatrader.exhaustcheck",
     "alpacatrader.rule",
+    "alpacatrader.oracle",
 ]
 
 
