@@ -93,7 +93,7 @@ def client() -> StockHistoricalDataClient:
     return _client
 
 
-def regular_hours(bars: pd.DataFrame) -> pd.DataFrame:
+def regular_hours(frame: pd.DataFrame) -> pd.DataFrame:
     """Only the bars opening inside the regular session, 09:30 to 16:00 New York.
 
     Alpaca serves pre- and post-market minutes on the same endpoint, and they are a different
@@ -105,37 +105,48 @@ def regular_hours(bars: pd.DataFrame) -> pd.DataFrame:
     year and the session does not. Half-days (13:00 closes) need no special case — they simply
     print no bar after their close — while a market holiday is a day with no bars at all.
     """
-    local = bars.index.tz_convert(EXCHANGE)
-    return bars[(local.time >= OPEN) & (local.time < CLOSE) & (local.dayofweek < 5)]
+    local = frame.index.tz_convert(EXCHANGE)
+    return frame[(local.time >= OPEN) & (local.time < CLOSE) & (local.dayofweek < 5)]
 
 
-def get_candles(symbol: str, timeframe: str, days: int, rth: bool = True) -> pd.DataFrame:
-    """OHLCV of one symbol over the last `days` calendar days, indexed by UTC bar-open time.
+def bars(symbol: str, timeframe: str, start, end=None, rth: bool = True) -> pd.DataFrame:
+    """OHLCV of one symbol between `start` and `end`, indexed by UTC bar-open time.
 
-    Empty DataFrame when Alpaca serves nothing for the symbol. `days` counts calendar days and not
-    sessions, so a 5-day window over a weekend is three sessions — the honest reading, since it is
-    the wall clock the data is requested on.
+    Empty DataFrame when Alpaca serves nothing for the symbol over that window. `end` defaults to
+    now, which on the free plan means the last bar is a quarter of an hour old — irrelevant to a
+    backtest and binding in live.
     """
-    bars = (
+    frame = (
         client()
         .get_stock_bars(
             StockBarsRequest(
                 symbol_or_symbols=symbol,
                 timeframe=TIMEFRAMES[timeframe],
-                start=datetime.now(timezone.utc) - timedelta(days=days),
+                start=start,
+                end=end,
                 adjustment=Adjustment.ALL,
                 feed=DataFeed(os.environ.get("ALPACA_FEED", "sip")),
             )
         )
         .df
     )
-    if bars.empty:
-        return bars
+    if frame.empty:
+        return frame
     # The index is (symbol, timestamp): with a single symbol the first level is noise.
-    bars = bars.droplevel("symbol").sort_index()
+    frame = frame.droplevel("symbol").sort_index()
     # Daily bars are already one per session; filtering them by open time would drop every one,
     # since Alpaca stamps them at midnight.
-    return regular_hours(bars) if rth and timeframe != "1d" else bars
+    return regular_hours(frame) if rth and timeframe != "1d" else frame
+
+
+def get_candles(symbol: str, timeframe: str, days: int, rth: bool = True) -> pd.DataFrame:
+    """`bars` over the last `days` calendar days.
+
+    Calendar days and not sessions, because that is the window the request is actually made on: a
+    five-day window over a weekend is three sessions, and saying so is more honest than counting
+    sessions the caller never asked about.
+    """
+    return bars(symbol, timeframe, datetime.now(timezone.utc) - timedelta(days=days), rth=rth)
 
 
 def _selfcheck() -> None:

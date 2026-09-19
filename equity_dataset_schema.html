@@ -704,6 +704,38 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <h4>Le due incognite che nessun backtest vede <span class="b b-open">aperto</span></h4>
     <p><strong>Il locate.</strong> La doc Alpaca dice che le vendite allo scoperto richiedono un locate approvato prima dell'ordine, in lotti tondi da 100 azioni, <em>monouso</em> — chiuso lo short, per rifarlo serve un nuovo locate. Il borrow sugli ETB è a costo zero, ma se l'obbligo di locate vale anche per gli ETB, una regola always-in che flippa ~200 volte l'anno per simbolo fa 200 chiamate di locate per simbolo, con la loro latenza e la loro possibilità di fallire. <strong>È la cosa più a rischio dell'intero progetto ed è verificabile in paper il primo giorno.</strong> Se cade, U1 resta valido ma il libro diventa long-only più un hedge di indice, che è una strategia diversa e va prezzata come tale.</p>
     <p><strong>La dispersione cross-sezionale.</strong> L'intera etichetta è un ordinamento dentro l'istante, diviso per la dispersione dell'istante. Venti ETF settoriali USA condividono un fattore di mercato molto forte, e <em>a frequenza intraday potrebbero condividerlo più di quanto facessero venti altcoin</em>. Se <code>sd_t</code> è piccola, l'etichetta è rumore diviso per un numero piccolo. È una misura da un'ora sullo store, e va fatta subito dopo la 3 — prima ancora della 5.</p>
+
+  <div class="box ok">
+    <h4>Misura 3.5 — chiusa in positivo, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p>Presa <em>prima</em> della 3 e non dopo: non serve lo store, bastano finestre campionate, e
+    un'ora che può invalidare l'etichetta sta davanti a quattro che la assumono. Barre 1m SIP di U1,
+    ricampionate <strong>dentro la sessione</strong> — il gap notturno non è una barra e non entra —
+    su tre regimi diversi, contro le venti coppie crypto del progetto precedente dal 2023.</p>
+    <div class="tw"><table>
+      <caption>deviazione standard cross-sezionale mediana dei rendimenti di barra</caption>
+      <thead><tr><th>set</th><th class="num">1m</th><th class="num">5m</th><th class="num">15m</th>
+      <th class="num">simboli</th></tr></thead>
+      <tbody>
+        <tr><td>U1 2018 (volatilità)</td><td class="num">0,000379</td><td class="num">0,000806</td><td class="num">0,001295</td><td class="num">18–19</td></tr>
+        <tr><td>U1 2022 (ribasso)</td><td class="num">0,000412</td><td class="num">0,000891</td><td class="num">0,001478</td><td class="num">20</td></tr>
+        <tr><td>U1 2026 (recente)</td><td class="num">0,000282</td><td class="num">0,000585</td><td class="num">0,001010</td><td class="num">19–20</td></tr>
+        <tr><td><strong>crypto 2023+</strong></td><td class="num">—</td><td class="num"><strong>0,001221</strong></td><td class="num"><strong>0,002034</strong></td><td class="num">20</td></tr>
+        <tr><td>rapporto crypto / U1</td><td class="num">—</td><td class="num">1,4× – 2,1×</td><td class="num">1,4× – 2,0×</td><td class="num"></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>L'etichetta ha materia prima.</strong> Il criterio di chiusura era «un ordine di
+    grandezza sotto il crypto»: lo scarto è un fattore fra 1,4 e 2,1, cioè lo <em>stesso</em> ordine.
+    Venti ETF americani disperdono meno di venti altcoin, e non di molto meno. Il timore che la
+    cross-section fosse degenere non si è avverato — anche perché l'universo è stato scelto su
+    questo criterio (§4, misura 1a) e non sui settori soltanto.</p>
+    <p>Due cose da portarsi dietro. <strong>Il regime recente è il più povero dei tre</strong>
+    (0,000585 a 5m contro 0,000891 nel 2022): un modello addestrato e giudicato solo sugli ultimi
+    anni affronta la versione più difficile del problema, il che è un argomento a favore dei quattro
+    fold e non contro. E la dispersione cresce circa come la <strong>radice della barra</strong>
+    (1m 0,000412 → 5m 0,000891 → 15m 0,001478, contro rapporti di radice 2,24 e 1,73): i movimenti
+    si accumulano quasi indipendentemente fra i membri del paniere, che è esattamente ciò che un
+    fattore comune dominante non farebbe.</p>
+  </div>
   </div>
 </section>
 

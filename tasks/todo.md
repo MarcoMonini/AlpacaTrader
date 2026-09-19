@@ -50,11 +50,14 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
       ✔ stamp della cache che rifiuta parametri diversi
       ✔ le **tre trappole** hanno una risposta misurata nel docstring: DST (UTC vs ET),
         mezze giornate, retroattività di `adjustment=all`
-- [ ] **M3.5** dispersione cross-sezionale `sd_t` · 1 h → M3 · **prima della M5**
+- [x] **M3.5** ✅ **passata 2026-09-19** — dispersione `sd_t` · presa **prima della M3**
       ↳ non è un doppione di M1a: quella è progetto su rendimenti daily, questa è validazione alla
         frequenza di trading, dove il fattore comune domina di più. Un E1 buono può fallire qui
       ✔ distribuzione per data su U1 a 1m/5m/15m, confrontata col crypto
-      ✘ un ordine sotto il crypto → l'etichetta non ha materia prima
+      ✔ **esito: 1,4×–2,1× sotto il crypto, non un ordine di grandezza. L'etichetta ha materia**
+      ✔ non serviva lo store: finestre campionate su tre regimi (2018 / 2022 / 2026)
+      ⚠ il regime **recente è il più povero** (0,000585 a 5m contro 0,000891 nel 2022)
+      ✔ la dispersione cresce come √barra: i membri si muovono quasi indipendentemente
 - [ ] **M4** **tempo di sessione** — indice locale, timestamp degradato a colonna · 1 g → M3
       ✔ decisione di regime: **(a) intraday-only, flat 16:00** (raccomandata)
       ✔ tre rami 1m/5m/15m, griglia base 1m (il 15m a N=24 è il tetto)
