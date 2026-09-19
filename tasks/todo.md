@@ -88,7 +88,13 @@ Ordine vincolante: §10 della specifica. `→` = dipende da. Dettaglio e criteri
       ⚠ **netto −2,0851**: pareggio a 0,201 bp contro 0,281 del nome più economico di U1
       ⚠ serve **un quinto del turnover** a parità di lordo — da 10,4 a 2,2 rotazioni/sessione
 - [x] **Checkpoint C** ✅ **go** — il lordo esiste e batte il null; il problema è raccoglierlo
-- [ ] **M5b** finestra e frequenza di decisione: su quale scala il segnale paga · → M5
+- [x] **M5b** ✅ **2026-09-19** — finestra e frequenza: su quale scala il segnale paga
+      ✘ **frequenza: non è una leva, è dannosa.** Stride 1→30: lordo ×0,030, turnover ×0,093
+      ✔ **finestra: leva reale ma piccola.** Ottimo interno a w=30 (+21% sul rapporto), piatto a 40
+      ⚠ l'ottimo (w=30 = 90 min, fondo 180) **sfora il tetto di attivazione di 1 ora** che cappa w a 20
+      ⚠ miglior pareggio 0,242 bp contro 0,281 del nome più economico: ancora sotto
+- [ ] **M5c** le due leve non provate: **selettività** (soglia sulla magnitudine, non isteresi) e
+      **larghezza del libro** θ. Servono ~3,9× sul rapporto lordo/costo, la finestra ne ha dati 1,21
 
 ## Fase D — etichetta, leakage, riferimento
 
