@@ -4,12 +4,27 @@ Unlike the crypto endpoint of the previous project, the stock one needs credenti
 `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` (Alpaca's own names, so every other tool in the
 ecosystem reads the same two). Paper-account keys are enough — nothing here places an order.
 
-`ALPACA_FEED` picks the feed and defaults to `iex`, which is what the free plan serves. `sip` is
-the consolidated tape and needs a market-data subscription; the spec's section 3 is why it is the
-one to measure on, IEX being ~2-3% of the volume and a biased sample at intraday frequency.
+`ALPACA_FEED` picks the feed and defaults to `sip`, the consolidated tape. Measured 2026-09-19: the
+historical SIP endpoint answers on free paper keys back to 2016-01-04, and only the *real-time*
+feed is paid — so there is no reason to train on anything else. IEX is ~2-3% of the volume (SPY 1m
+at 2024-06-03 14:30 reads v=577 / n=14 against SIP's v=75,038 / n=2,495) and its daily history
+starts in 2018 with gaps, which is what made the first run of `universe` unusable.
 
-Bars come back split- and dividend-adjusted (`adjustment=all`) and indexed by the *open* time of
-the bar in UTC, which is the alignment rule everything downstream depends on.
+Bars come back **split-adjusted only** (`adjustment=split`) and indexed by the *open* time of the
+bar in UTC, which is the alignment rule everything downstream depends on.
+
+The split adjustment is not negotiable: an uncorrected 2:1 prints a −50% log return that the pivots
+read as a leg and the label as an opportunity. The dividend adjustment is deliberately *off*, which
+departs from §3's stated parameter while serving the design §3 states — "splits into the series,
+dividends into the cost". Measured 2026-09-19: XLU has never split, and `adjustment=all` still
+rewrites its 2016 close from $43.19 to $31.22, a factor of 0.723, because ten years of dividends are
+discounted backwards. An ETF pays quarterly, so `all` rewrites the whole history of every symbol
+four times a year and no measurement taken on it reproduces months later. With `split` the store
+moves only on a real split, which is rare and visible.
+
+What it costs: the ex-date prints a drop that is not a move. In the intraday-only regime of §7 that
+drop lands at the open, inside the overnight gap every return already discards — so in this regime
+it costs nothing. It would cost something again the day the book holds overnight.
 
 **No gapless grid here, unlike the crypto project.** There, a period with no trade got a synthetic
 flat bar because the market never closes. An equity session does: between the 15:55 bar and the
@@ -32,6 +47,9 @@ from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 TIMEFRAMES = {
     "1m": TimeFrame(1, TimeFrameUnit.Minute),
+    # 3m is the research grid, chosen in M4. It is here so the page can draw exactly what the
+    # measurements are taken on rather than something adjacent to it.
+    "3m": TimeFrame(3, TimeFrameUnit.Minute),
     "5m": TimeFrame(5, TimeFrameUnit.Minute),
     "15m": TimeFrame(15, TimeFrameUnit.Minute),
     "1h": TimeFrame(1, TimeFrameUnit.Hour),
@@ -43,11 +61,9 @@ TIMEFRAMES = {
 EXCHANGE = "America/New_York"
 OPEN, CLOSE = time(9, 30), time(16, 0)
 
-# A starting universe, not the one the spec will settle on: section 4 leaves the twenty symbols
-# open on a spread measurement nobody has taken yet. These are liquid, long-history and cheap in
-# basis points, which is enough for a page whose job is to prove the pipe works. The picker takes
-# a typed symbol too, so the list is a starting point rather than a ceiling.
-SYMBOLS = ["SPY", "QQQ", "XLK", "XLV", "XLE", "XLF", "AAPL", "MSFT", "NVDA", "AMZN"]
+# No symbol list lives here. This module fetches whatever it is asked for, and the universe is a
+# measured decision that belongs to `universe` (E1, then U1) — which reads *this* module to take it.
+# A list here would either duplicate that decision or invert the dependency.
 
 # The repository root, from this file rather than from the working directory: the page is started
 # by an absolute path as often as not, and `.env` does not move when the caller does.
@@ -93,7 +109,7 @@ def client() -> StockHistoricalDataClient:
     return _client
 
 
-def regular_hours(bars: pd.DataFrame) -> pd.DataFrame:
+def regular_hours(frame: pd.DataFrame) -> pd.DataFrame:
     """Only the bars opening inside the regular session, 09:30 to 16:00 New York.
 
     Alpaca serves pre- and post-market minutes on the same endpoint, and they are a different
@@ -105,37 +121,48 @@ def regular_hours(bars: pd.DataFrame) -> pd.DataFrame:
     year and the session does not. Half-days (13:00 closes) need no special case — they simply
     print no bar after their close — while a market holiday is a day with no bars at all.
     """
-    local = bars.index.tz_convert(EXCHANGE)
-    return bars[(local.time >= OPEN) & (local.time < CLOSE) & (local.dayofweek < 5)]
+    local = frame.index.tz_convert(EXCHANGE)
+    return frame[(local.time >= OPEN) & (local.time < CLOSE) & (local.dayofweek < 5)]
 
 
-def get_candles(symbol: str, timeframe: str, days: int, rth: bool = True) -> pd.DataFrame:
-    """OHLCV of one symbol over the last `days` calendar days, indexed by UTC bar-open time.
+def bars(symbol: str, timeframe: str, start, end=None, rth: bool = True) -> pd.DataFrame:
+    """OHLCV of one symbol between `start` and `end`, indexed by UTC bar-open time.
 
-    Empty DataFrame when Alpaca serves nothing for the symbol. `days` counts calendar days and not
-    sessions, so a 5-day window over a weekend is three sessions — the honest reading, since it is
-    the wall clock the data is requested on.
+    Empty DataFrame when Alpaca serves nothing for the symbol over that window. `end` defaults to
+    now, which on the free plan means the last bar is a quarter of an hour old — irrelevant to a
+    backtest and binding in live.
     """
-    bars = (
+    frame = (
         client()
         .get_stock_bars(
             StockBarsRequest(
                 symbol_or_symbols=symbol,
                 timeframe=TIMEFRAMES[timeframe],
-                start=datetime.now(timezone.utc) - timedelta(days=days),
-                adjustment=Adjustment.ALL,
-                feed=DataFeed(os.environ.get("ALPACA_FEED", "iex")),
+                start=start,
+                end=end,
+                adjustment=Adjustment.SPLIT,
+                feed=DataFeed(os.environ.get("ALPACA_FEED", "sip")),
             )
         )
         .df
     )
-    if bars.empty:
-        return bars
+    if frame.empty:
+        return frame
     # The index is (symbol, timestamp): with a single symbol the first level is noise.
-    bars = bars.droplevel("symbol").sort_index()
+    frame = frame.droplevel("symbol").sort_index()
     # Daily bars are already one per session; filtering them by open time would drop every one,
     # since Alpaca stamps them at midnight.
-    return regular_hours(bars) if rth and timeframe != "1d" else bars
+    return regular_hours(frame) if rth and timeframe != "1d" else frame
+
+
+def get_candles(symbol: str, timeframe: str, days: int, rth: bool = True) -> pd.DataFrame:
+    """`bars` over the last `days` calendar days.
+
+    Calendar days and not sessions, because that is the window the request is actually made on: a
+    five-day window over a weekend is three sessions, and saying so is more honest than counting
+    sessions the caller never asked about.
+    """
+    return bars(symbol, timeframe, datetime.now(timezone.utc) - timedelta(days=days), rth=rth)
 
 
 def _selfcheck() -> None:

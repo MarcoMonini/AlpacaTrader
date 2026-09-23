@@ -34,8 +34,15 @@ target-version = "py312"
 select = ["E", "F", "I"]
 
 [dependency-groups]
+# scipy is dev and never runtime, and the asymmetry is the point. `metrics.spearman` exists
+# because `Series.corr(method="spearman")` imports scipy *lazily* from inside pandas' nanops, so
+# the call survives every import-time check and fails only where the page is served. scipy is here
+# so the self-check can assert the replacement **equal** to pandas' own rather than close to it —
+# and `tests/test_deploy.py` bans the call everywhere but `metrics`, which has to make it to prove
+# the equality. Both halves, or the guarantee is not one.
 dev = [
     "black>=26.5.1",
     "pytest>=9.1.1",
     "ruff>=0.16.6",
+    "scipy>=1.14",
 ]

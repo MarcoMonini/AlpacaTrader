@@ -301,6 +301,61 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
   <div class="box open">
     <h4>La trappola che questa sezione deve ancora verificare <span class="b b-open">aperto</span></h4>
     <p>Il documento precedente elencava due trappole nei dump Binance — <code>open_time</code> passato da millisecondi a microsecondi senza marcatore di versione, e file con riga di header — trovate solo costruendo lo store. Le trappole equivalenti su Alpaca non sono ancora note. Le tre da controllare per prime, perché rompono in silenzio: il fuso del timestamp restituito (UTC contro ET) attraverso i due cambi DST annuali; il comportamento sulle mezze giornate di borsa; e se la retroattività di <code>adjustment=all</code> riscrive le barre storiche a ogni nuovo split, il che renderebbe lo store non riproducibile e lo stamp della cache incapace di accorgersene.</p>
+
+  <div class="box ok">
+    <h4>Misura 3 — store costruito, e le tre trappole hanno risposta <span class="b b-msr">misurato</span></h4>
+    <p>20 simboli, <strong>2.693 sessioni</strong>, 2016-01-04 → 2026-09-18, 1m nativo, SIP, RTH.
+    Circa 20,9 milioni di barre, 531 MB. Un file per simbolo: 5m e 15m si ricavano leggendo, perché
+    un file 5m su disco è una seconda copia che può sfasarsi rispetto al padre.</p>
+    <p><strong>Trappola 1 — fuso e DST: nessuna sorpresa.</strong> La sessione apre alle 09:30
+    locali in tutte e 2.693 le sessioni; in UTC alterna 13:30 e 14:30 e si è spostata
+    <strong>21 volte</strong> in 10,7 anni, cioè due volte l'anno. Confrontare sull'orologio della
+    borsa e non su un offset è sufficiente, ed è ciò che <code>regular_hours</code> fa.</p>
+    <p><strong>Trappola 2 — mezze giornate: diversa da come era scritta.</strong> Una mezza giornata
+    <em>non</em> si ferma alle 13:00. Il nastro SIP porta stampe tardive e fuori sequenza per ore:
+    il 25-11-2016 chiude alle 13:00 e ha l'ultima barra alle <strong>15:35</strong>, il 3-07-2018
+    alle 15:22. Rilevarle dall'orario di chiusura le manca tutte. La regola misura invece quanto è
+    <em>affollato il pomeriggio</em>: 21 mezze giornate, 2,0 l'anno, mediana 214 barre di cui 4 dopo
+    le 13:00, contro 390 barre e 180 di una sessione piena. <strong>Il calendario va preso a
+    maggioranza fra i simboli</strong>: sull'unione degli indici le stampe tardive di venti simboli
+    si sommano e ne fanno trovare 8 invece di 21.</p>
+    <p><strong>Trappola 3 — retroattività: peggio del previsto, e ha cambiato un parametro.</strong>
+    XLU non ha <em>mai</em> fatto split, e <code>adjustment=all</code> riscrive comunque la sua
+    chiusura del 4-01-2016 da <strong>$43,19 a $31,22</strong> — dieci anni di dividendi scontati
+    all'indietro. Un ETF stacca trimestralmente, quindi <code>all</code> riscrive tutto lo storico
+    di ogni simbolo quattro volte l'anno e nessuna misura presa su quello store si riproduce a mesi
+    di distanza. Lo store è costruito <code>adjustment=split</code>: gli split restano corretti — la
+    metà non negoziabile — e i dividendi escono dalla serie per entrare in <code>costs</code> sulla
+    sola gamba corta, che è il disegno dichiarato in questa stessa sezione. Costo: l'ex-date stampa
+    un salto che non è un movimento, e nel regime intraday-only cade dentro il gap notturno che ogni
+    rendimento già scarta. Tornerebbe a costare il giorno in cui il libro tenesse overnight.</p>
+    <div class="box no" style="margin-top:14px">
+      <h4>La trappola che nessuno cercava, e che rompe in silenzio</h4>
+      <p><strong>L'intervallo che l'endpoint restituisce dipende dalla fine richiesta.</strong>
+      Misurato su JNK:</p>
+      <div class="tw"><table>
+        <thead><tr><th>richiesta</th><th>prima barra</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><code>2019-03-31 → 2019-04-10</code></td><td>2019-04-01</td><td>corretta</td></tr>
+          <tr><td><code>2019-03-31 → 2019-05-04</code></td><td>2019-04-01</td><td>corretta</td></tr>
+          <tr><td><code>2019-03-31 → 2019-06-30</code></td><td><strong>2019-05-06</strong></td><td>aprile sparito</td></tr>
+          <tr><td><code>2019-04-01 → 2019-06-30</code></td><td><strong>2019-05-06</strong></td><td>aprile sparito</td></tr>
+        </tbody>
+      </table></div>
+      <p>Allargando la finestra un tratto iniziale scompare: nessun errore, nessun avviso, un
+      <code>next_page_token</code> del tutto normale. Una build a trimestri è costata a JNK
+      <strong>24 sessioni di aprile 2019</strong> e nulla nella risposta lo diceva. I chunk sono
+      passati a mensili, e <code>verify</code> conta le sessioni di ogni simbolo contro il
+      calendario di consenso: <strong>lo store non si considera buono perché il fetch sembra
+      giusto, ma perché le sessioni tornano</strong>. Dopo <code>repair</code> — che rifà le
+      sessioni mancanti <em>una per una</em>, perché anche la finestra mensile perdeva il 1–3
+      maggio — tutti e venti i simboli sono a zero mancanti.</p>
+    </div>
+    <p>Restano 7 sessioni su 2.693 sotto il 98% delle barre attese, e non sono buchi: 2020-03-09,
+    03-12, 03-16 e 03-18 a 376 barre sono i <strong>circuit breaker</strong> del COVID, quattordici
+    minuti di sospensione a mercato intero. Più 102 giorni feriali senza sessione, 9,5 l'anno, che
+    sono i festivi NYSE.</p>
+  </div>
   </div>
 </section>
 
@@ -348,6 +403,51 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <h4>Misura 1, e nessuna riga di training la precede <span class="b b-open">aperto</span></h4>
     <p>Sei settori su undici hanno un guadagno potenziale di costo fra 2× e 4×, che è dello stesso ordine del fattore che ha ucciso il progetto precedente. La decisione dipende interamente da una quantità non ancora misurata: lo <strong>spread effettivo</strong>, in centesimi, di ciascun candidato, letto sui <em>quote</em> Alpaca e non dedotto dall'high-low delle barre.</p>
     <p>Regola di decisione, fissata prima di guardare l'output: per ogni settore vince l'emittente con il costo totale per lato più basso, calcolato con la formula di §2 e lo spread <em>mediano ponderato per il tempo</em> dentro RTH, escluse la prima e l'ultima mezz'ora di sessione. Se i due sono entro il 10%, vince quello con ADV più alto — perché la capacità è un vincolo che il backtest non vede.</p>
+  </div>
+
+  <div class="box ok">
+    <h4>Misure 1a e 1b — chiuse, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p><strong>1a, le esposizioni.</strong> L'universo è stato deciso <em>prima</em> del costo e
+    senza di esso: venti esposizioni scelte minimizzando la correlazione massima a coppie dei
+    rendimenti daily, stimate sul primo fold (2016 → 2019) e solo verificate dopo.
+    Correlazione media <strong>0,3537 in stima e 0,3517 dopo il taglio</strong> — la scorrelazione
+    è una proprietà, non un fit. Contro il paniere di dodici settori che questa sezione teme, la
+    dispersione cross-sezionale è <strong>+26%</strong> in stima e <strong>+22%</strong> dopo.
+    La coppia peggiore è XLB/XLU a 0,841, dal ciclo dei tassi e non da holding sovrapposte.</p>
+    <p>Due coppie erano in rapporto di contenimento — KRE dentro XLF, XBI dentro XLV — che nessuna
+    correlazione può vedere perché è un fatto su cosa i fondi detengono. Risolte in favore del
+    <em>contenitore</em>, più liquido e più capiente, coerentemente coi criteri 2 e 3.</p>
+    <p><strong>1b, gli strumenti — e questa misura ha ucciso l'ipotesi centrale della sezione.</strong>
+    La leva era che un Vanguard settoriale costa 2–4,5× più per azione e sarebbe quindi 2–4,5× più
+    economico in punti base, <em>«se lo spread quotato resta di un centesimo, il che a quel livello
+    di AUM non è scontato»</em>. Non resta di un centesimo. Spread mediani ponderati per il tempo,
+    misurati su quote SIP del 16–18 settembre, 24 finestre da 30s dentro RTH escluse le mezz'ore:</p>
+    <div class="tw"><table>
+      <caption>la colonna «pareggio» di questa sezione ha previsto <strong>tutte e sette</strong> le
+      decisioni: ogni Vanguard sopra la sua soglia perde, l'unico sotto vince</caption>
+      <thead><tr><th>esposizione</th><th>SPDR / iShares</th><th class="num">bp</th>
+      <th>alternativa</th><th class="num">spread</th><th class="num">bp</th>
+      <th class="num">pareggio §4</th><th>vince</th></tr></thead>
+      <tbody>
+        <tr><td>utility</td><td>XLU 1¢</td><td class="num">1,332</td><td>VPU</td><td class="num">7¢</td><td class="num">2,056</td><td class="num">4,3¢</td><td>XLU</td></tr>
+        <tr><td>materiali</td><td>XLB 1¢</td><td class="num">1,108</td><td>VAW</td><td class="num">12¢</td><td class="num">2,754</td><td class="num">4,5¢</td><td>XLB</td></tr>
+        <tr><td>salute</td><td>XLV 2¢</td><td class="num">0,703</td><td>VHT</td><td class="num">16¢</td><td class="num">2,637</td><td class="num">1,9¢</td><td>XLV</td></tr>
+        <tr><td>consumo dif.</td><td>XLP 1¢</td><td class="num">0,714</td><td>VDC</td><td class="num">9¢</td><td class="num">2,107</td><td class="num">2,7¢</td><td>XLP</td></tr>
+        <tr><td>comunicazioni</td><td>XLC 1¢</td><td class="num">0,556</td><td>VOX</td><td class="num">7¢</td><td class="num">1,930</td><td class="num">1,7¢</td><td>XLC</td></tr>
+        <tr><td>finanziari</td><td>XLF 1¢</td><td class="num">1,015</td><td>VFH</td><td class="num">2¢</td><td class="num">0,843</td><td class="num">2,4¢</td><td><strong>VFH</strong></td></tr>
+        <tr><td>immobiliare</td><td>XLRE 1¢</td><td class="num">1,289</td><td>VNQ</td><td class="num">1¢</td><td class="num">0,646</td><td class="num">2,2¢</td><td><strong>VNQ</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>U1:</strong> SMH · UUP · XLU · SHY · XOP · SLV · VFH · XHB · XRT · XLP · XLV · JNK ·
+    VNQ · FXI · XLB · TLT · XLC · EFA · IWM · TIP. Costo per lato da <strong>0,281 bp</strong> (IWM)
+    a <strong>2,170 bp</strong> (XHB): il paniere copre ancora <strong>7,7×</strong> di costo, quindi
+    il vettore per simbolo di §2 resta necessario dopo la scelta degli strumenti, non prima.</p>
+    <div class="box open" style="margin-top:14px">
+      <p><strong>Tre nomi stanno sopra 1,76 bp</strong> — XHB 2,170, XOP 1,927, UUP 1,899 — cioè
+      sopra il miglior punto di pareggio che questo progetto abbia mai misurato. Non li squalifica:
+      il pareggio è una proprietà di una regola, non di uno strumento. Ma una regola che paga solo
+      su quei tre non ha superato la barra che il progetto precedente non ha mai superato.</p>
+    </div>
   </div>
 
   <h3>Universo U1 — venti ETF <span class="b b-open">candidato, in attesa della misura 1</span></h3>
@@ -451,6 +551,31 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <li><strong>δ della Huber</strong> — mediana di <code>|target|</code> sul solo train. Cambia con l'etichetta e quindi con l'asset class. 2,1 non ha significato qui.</li>
     <li><strong>Orizzonte di purging</strong> — la distanza al pivot successivo, misurata p50 28 / p95 124 / p99 202 / max 754 barre su crypto. Va rimisurata in barre di sessione, e il massimo è il numero che conta perché il purging è esatto.</li>
   </ul>
+
+  <div class="box ok">
+    <h4>Misura 0 — chiusa in negativo, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p>La cella argmax della griglia (<code>smoothing</code> 0,20, <code>window</code> 12) quotata
+    contro il <strong>prezzo</strong> con <code>legcheck</code>, sul suo stesso slice di test —
+    54.931 righe, 20 simboli, 2025-06-01 → 2026-09-02, breadth 19,95. Rank IC contro l'etichetta
+    riprodotta a 0,4753, identica a quella registrata da <code>legsweep</code>: è la cella giusta.</p>
+    <div class="tw"><table>
+      <caption>rendimento forward market-neutral per decile di predizione — nessun decile
+      raggiunge |t| &gt; 2, nessuna monotonia</caption>
+      <thead><tr><th>orizzonte</th><th class="num">ic_raw</th><th class="num">ic_residual</th>
+      <th class="num">decile 0, t</th><th class="num">decile 9, t</th><th class="num">max |t|</th></tr></thead>
+      <tbody>
+        <tr><td>6 barre</td><td class="num">−0,0194</td><td class="num">−0,0214</td><td class="num">−0,59</td><td class="num">−0,05</td><td class="num">1,68</td></tr>
+        <tr><td>24 barre</td><td class="num">−0,0060</td><td class="num">−0,0095</td><td class="num">−1,51</td><td class="num">−0,52</td><td class="num">1,54</td></tr>
+        <tr><td>72 barre</td><td class="num">+0,0080</td><td class="num">+0,0049</td><td class="num">−0,95</td><td class="num">+0,97</td><td class="num">0,97</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Verdetto: la griglia non aveva un vincitore.</strong> 0,4753 contro l'etichetta è
+    −0,0194 contro il prezzo a 6 barre — lo stesso schema del 0,4114 → −0,0405 già a verbale, e
+    quello che la colonna <code>edge</code> (0,0330 contro 0,0298, tre semi di rumore) già
+    suggeriva. La griglia <strong>non va rifatta sulla Rank IC</strong>: riprodurrebbe lo stesso
+    non-risultato a un costo di 117 addestramenti. <code>peso_tempo</code> e
+    <code>finestra_estremi</code> restano da rimisurare su equity con giudice il prezzo (misura 6).</p>
+  </div>
 </section>
 
 <!-- ============================================================ 6 -->
@@ -479,6 +604,33 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     </table>
   </div>
   <p>Due rimedi possibili, e vanno confrontati, non scelti a priori: <strong>(i)</strong> normalizzare ogni colonna di volume contro la mediana storica <em>della stessa fascia oraria</em> — stessa aritmetica di <code>log_volume_vs_median</code> con un raggruppamento in più; <strong>(ii)</strong> lasciarle grezze e aggiungere due colonne di orario (seno e coseno della frazione di sessione trascorsa), lasciando al modello il compito di condizionare. La (ii) è meno codice e più onesta come misura; la (i) rende le colonne confrontabili fra simboli, che è ciò che serve a un'etichetta cross-sezionale. <strong>Nota di cautela:</strong> l'ora del giorno è la variabile più prevedibile del mercato, quindi un modello che la riceve produrrà una Rank IC alta contro qualunque etichetta con struttura intraday. Va controllata con una baseline a sola ora del giorno, esattamente come <code>rsi_centered</code> controlla la griglia di <code>legsweep</code>.</p>
+
+  <div class="box ok">
+    <h4>Il confronto fra i due rimedi — chiuso, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p><strong>Vince il rimedio (i), e non di poco.</strong> <code>volume_climax</code> è stato
+    calcolato in due versioni sullo stesso pannello: fondo <em>dentro</em> la sessione contro le sue
+    barre recenti, cieco alla U; e fondo <em>fra</em> sessioni contro lo storico dello stesso simbolo
+    allo stesso minuto del giorno, che della U è fatto — mediana espandente sulle sole sessioni
+    passate, quindi causale e senza bisogno della regola train-only.</p>
+    <div class="tw"><table>
+      <caption>Rank IC contro il rendimento forward market-neutral, media e dispersione sui quattro fold</caption>
+      <thead><tr><th>versione</th><th class="num">h=5</th><th class="num">h=15</th><th class="num">h=30</th><th>segno stabile</th></tr></thead>
+      <tbody>
+        <tr><td>fondo dentro la sessione</td><td class="num">+0,0025</td><td class="num">+0,0008</td><td class="num">+0,0016</td><td><strong>no, a tutti e tre</strong></td></tr>
+        <tr><td><strong>fondo stagionale</strong></td><td class="num">−0,0048</td><td class="num">−0,0059</td><td class="num">−0,0067</td><td><strong>sì, a tutti e tre</strong></td></tr>
+        <tr><td>rapporto |IC| / sd</td><td class="num">0,86 → 2,82</td><td class="num">0,40 → 2,68</td><td class="num">0,73 → 3,35</td><td></td></tr>
+      </tbody>
+    </table></div>
+    <p>La versione stagionale ha il rapporto più alto di tutta la tabella delle otto colonne
+    (<strong>3,35</strong>) e cambia anche <em>segno</em> rispetto all'altra: normalizzare per fascia
+    oraria non è una rifinitura, è ciò che separa un segnale da un artefatto della giornata.</p>
+    <p class="lead">Nota sul controllo a sola ora del giorno che questa sezione impone: <strong>è
+    degenere cross-sezionalmente</strong> e non è stato costruito. L'ora è lo stesso numero per ogni
+    simbolo in un dato istante, quindi una colonna di sola ora ha dispersione cross-sezionale nulla
+    e non può produrre Rank IC. Ciò che sopravvive della U è la parte che <em>differisce fra
+    simboli</em>, ed è esattamente quella che il confronto qui sopra misura. Il rimedio (ii) —
+    seno e coseno della frazione di sessione — è degenere per la stessa ragione.</p>
+  </div>
 
   <h3>3 · N va riscelto, e il ramo lento ha un tetto <span class="b b-msr">da rimisurare</span></h3>
   <p>La regola «N in barre, non in ore» tiene e resta il motivo per cui i rami sono complementari invece di essere copie ricampionate dello stesso. Ma nel regime intraday-only si aggiunge un vincolo che su crypto non poteva esistere: <strong>il ramo più lento, a N step, deve stare dentro una sessione</strong>. Con 6,5 ore:</p>
@@ -522,6 +674,61 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <p><strong>Indice di barra locale alla sessione.</strong> Il frame si costruisce sulla timeline di sessione <em>concatenata</em> — le barre di ogni sessione una dietro l'altra, con un intero progressivo che non salta mai — e il timestamp resta come colonna, usata solo per lo split temporale, il join fra rami e il calendario delle azioni societarie.</p>
     <p>La ragione per cui il refactor è contenuto: <strong>tutto ciò che sta a valle è già posizionale</strong>. <code>features</code> lavora su finestre di N barre, <code>find_pivots</code> su order barre, il tensore su 24 step, il purging su indici di riga. Nessuno di questi legge un timestamp. Cambiano due cose: <code>dataset.build</code> (campionamento e piazzamento dei rami) e la costruzione della griglia in <code>data.candles.complete</code>, che deve riempire i buchi <em>dentro</em> la sessione e mai fra sessioni.</p>
     <p>Regola derivata, da mettere a test: <strong>nessuna finestra rolling e nessun forward fill attraversa una chiusura.</strong> Il test è lo stesso per troncamento che già protegge l'allineamento — si tronca la serie a una chiusura e si verifica che nessuna colonna della sessione successiva cambi.</p>
+
+  <div class="box ok">
+    <h4>Misura 4 — griglia e finestre fissate, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p><strong>Griglia 3m, non 1m.</strong> §6 proponeva la griglia base a un minuto. Misurato sullo
+    store: a 1m la breadth media è <strong>18,94</strong> e la cross-section è completa solo nel
+    <strong>33,1%</strong> degli istanti, contro 19,74 e 80,2% a 3m. Il vincolo è UUP, che copre il
+    67,7% delle barre a 1m e il 90,3% a 3m. §9 rifiuta un file la cui breadth non sia ~20, e a 1m lo
+    sarebbe per due terzi del tempo. 390 minuti fanno 130 barre da tre esatte, 210 ne fanno 70.</p>
+    <p><strong>Tetto di attivazione: un'ora.</strong> Decisione di progetto, più stretta del «dentro
+    la sessione» di §6. Con il warm-up pagato <em>ogni</em> sessione — nessuna finestra attraversa
+    una chiusura — le <code>2N</code> barre si tolgono da 130, non da tutto lo store.</p>
+    <p><strong>N = 15 (45 min), fissato.</strong> <strong>W = 15, provvisorio</strong>: §5 assegna
+    <code>finestra_estremi</code> alla misura 6, che la sceglie sul P&L d'oracolo penalizzato dal
+    ritardo. Su 130 barre, <code>130 − max(2N, W) − W = 85</code> righe utilizzabili, il 65%.</p>
+    <div class="tw"><table>
+      <caption>W misurato su barre 3m di cinque simboli dal 2024, con un estremo centrato a
+      finestra mobile al posto di <code>find_pivots</code>: i valori assoluti si sposteranno, l'ordine no</caption>
+      <thead><tr><th class="num">W</th><th class="num">durata</th><th class="num">gambe/sessione</th>
+      <th class="num">gamba mediana</th><th class="num">R² posizione ~ ora</th>
+      <th class="num">costo a operare ogni gamba</th></tr></thead>
+      <tbody>
+        <tr><td class="num">10</td><td class="num">30 min</td><td class="num">6,4</td><td class="num">36 min</td><td class="num">0,057</td><td class="num">23,5%/anno</td></tr>
+        <tr><td class="num">12</td><td class="num">36 min</td><td class="num">5,0</td><td class="num">42 min</td><td class="num">0,082</td><td class="num">18,4%/anno</td></tr>
+        <tr><td class="num"><strong>15</strong></td><td class="num">45 min</td><td class="num">3,5</td><td class="num">51 min</td><td class="num">0,130</td><td class="num">12,9%/anno</td></tr>
+        <tr><td class="num">16</td><td class="num">48 min</td><td class="num">3,1</td><td class="num">51 min</td><td class="num">0,149</td><td class="num">11,4%/anno</td></tr>
+        <tr><td class="num">20</td><td class="num">60 min</td><td class="num">2,0</td><td class="num">63 min</td><td class="num"><strong>0,226</strong></td><td class="num">7,4%/anno</td></tr>
+      </tbody>
+    </table></div>
+    <div class="box no" style="margin-top:14px">
+      <p><strong>W grande confonde l'etichetta con l'orologio.</strong> A W=20 la sessione contiene
+      due gambe, e la posizione lungo la gamba <em>è</em> l'ora del giorno: il <strong>23%</strong>
+      della varianza dell'etichetta è il calendario. §6 avverte che un modello a cui arriva l'ora
+      produce Rank IC alta contro qualunque etichetta con struttura intraday, e le sei colonne di
+      volume gliela passano attraverso la U giornaliera. Su un'etichetta che §5 ha già misurato come
+      retrospettiva, sarebbero due confondimenti che si moltiplicano. <strong>16 e 20 sono esclusi
+      dalla griglia della misura 6</strong>, che resta {10, 12, 15}.</p>
+      <p>Il costo va nella direzione opposta — operare ogni gamba costa il 23,5% l'anno a W=10 e il
+      7,4% a W=20, al costo mediano del paniere — ed è precisamente per questo che la scelta è della
+      misura 6 e non di una preferenza: il P&L d'oracolo penalizzato dal ritardo prezza entrambi i
+      lati dello stesso compromesso.</p>
+    </div>
+    <p><strong>Il taglio delle mezze giornate, che nessuna sezione prevedeva.</strong> Il nastro
+    continua a stampare per ore dopo la campana dell'una: IWM il 3-07-2018 porta <strong>48 barre da
+    tre minuti fra le 13:00 e le 15:21</strong>, contigue abbastanza da sembrare un pomeriggio
+    normale. Non sono un mercato — nulla poteva essere comprato o venduto a quei prezzi — e lasciate
+    dentro sarebbero il 60% delle righe di quella sessione, dentro le feature, dentro l'etichetta e
+    dentro il P&L. <code>session.frame</code> le taglia: le 21 mezze giornate tornano a 70 barre
+    esatte. Restano 2.671 sessioni piene a 130 e <strong>una sola anomala</strong> (2019-08-12, 121
+    barre); i circuit breaker del marzo 2020 restano a 130, perché a 3m una sospensione di quattordici
+    minuti non lascia bucket vuoti.</p>
+    <p>Il <strong>test per troncamento</strong> passa sullo store reale: tagliata la serie a una
+    chiusura, nessuna colonna della sessione precedente cambia, in entrambe le direzioni. I salti fra
+    sessioni consecutive misurano da <strong>17,5 a 89,5 ore</strong>, che è la dimensione esatta
+    dell'assunzione caduta.</p>
+  </div>
   </div>
 
   <h3>Cosa resta identico <span class="b b-ok">riusabile</span></h3>
@@ -582,6 +789,61 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     </table>
   </div>
 
+  <div class="box ok">
+    <h4>Misura 5 — chiusa, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p>Nessun addestramento. Otto colonne causali contro il rendimento forward market-neutral, e il
+    libro dollar-neutral sul quinto superiore e inferiore della cross-section, piatto a ogni chiusura,
+    con il vettore di costo per simbolo di §2.</p>
+    <div class="tw"><table>
+      <caption>libro a θ=0,2, 2.693 sessioni, 500 rotazioni per riga — log per anno</caption>
+      <thead><tr><th>colonna</th><th class="num">lordo</th><th class="num">null</th><th class="num">z</th>
+      <th class="num">costo</th><th class="num">netto</th><th class="num">turnover/anno</th></tr></thead>
+      <tbody>
+        <tr><td><strong>stretch</strong></td><td class="num"><strong>+0,5601</strong></td><td class="num">−0,0001 ± 0,0198</td><td class="num"><strong>28,24</strong></td><td class="num">2,6451</td><td class="num"><strong>−2,0851</strong></td><td class="num">27.907</td></tr>
+        <tr><td>stretch, segno invertito</td><td class="num">−0,5472</td><td class="num">+0,0022 ± 0,0206</td><td class="num">−26,68</td><td class="num">2,6438</td><td class="num">−3,1910</td><td class="num">27.883</td></tr>
+        <tr><td><strong>streak</strong></td><td class="num">+0,5192</td><td class="num">−0,0007 ± 0,0215</td><td class="num">24,20</td><td class="num">4,9055</td><td class="num">−4,3863</td><td class="num">49.551</td></tr>
+        <tr><td>composite</td><td class="num">+0,0372</td><td class="num">+0,0113 ± 0,0135</td><td class="num">1,92</td><td class="num">1,0554</td><td class="num">−1,0182</td><td class="num">11.564</td></tr>
+        <tr><td>volume_climax_seasonal</td><td class="num">+0,0227</td><td class="num">−0,0004 ± 0,0203</td><td class="num">1,13</td><td class="num">4,8358</td><td class="num">−4,8131</td><td class="num">50.464</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Lo sbarramento di §10 passa, e non di poco.</strong> «Lordo ≤ 0 contro
+    <code>rotation_null</code> → nessun lavoro di modello lo salva»: il lordo di <code>stretch</code>
+    è +0,56 log l'anno contro un null di −0,0001 ± 0,0198, <strong>z = 28,2</strong>. Ruotate a fase
+    casuale, le stesse posizioni guadagnano zero. Sul venue precedente lo stesso test leggeva
+    z = −0,06: <strong>questo è l'opposto di quel risultato</strong>. Il controllo di simmetria tiene
+    — invertendo il segno il lordo è −0,5472, uno specchio quasi esatto.</p>
+    <div class="box no" style="margin-top:14px">
+      <h4>Il criterio 3 di §9 fallisce, e il numero dice dove</h4>
+      <div class="tw"><table>
+        <thead><tr><th>regola</th><th class="num">bp pagati</th><th class="num">bp di pareggio</th><th class="num">fattore</th></tr></thead>
+        <tbody>
+          <tr><td>stretch</td><td class="num">0,948</td><td class="num"><strong>0,201</strong></td><td class="num">4,7×</td></tr>
+          <tr><td>streak</td><td class="num">0,990</td><td class="num">0,105</td><td class="num">9,4×</td></tr>
+          <tr><td>composite</td><td class="num">0,913</td><td class="num">0,032</td><td class="num">28,4×</td></tr>
+        </tbody>
+      </table></div>
+      <p>Il costo per lato più basso di U1 è <strong>IWM a 0,281 bp</strong>; la regola su
+      <code>stretch</code> pareggia a <strong>0,201 bp</strong>. Operando <em>solo</em> lo strumento
+      più economico del paniere, questa regola perderebbe comunque. Non è un problema di venue — è
+      già il venue scelto perché costa 15–150 volte meno — è un problema di <strong>frequenza</strong>:
+      27.907 unità di peso l'anno, ~10,4 rotazioni a sessione su un libro che ne paga 8 di
+      obbligatorie. Il pareggio richiede <strong>un quinto del turnover a parità di lordo</strong>,
+      da 10,4 a 2,2 per sessione.</p>
+      <p>È l'avvertimento di §2 verificato sul campo: <em>«con la commissione a zero la curva di costo
+      diventa piatta nel numero di trade — e questo invita ad aumentare la frequenza. È l'inferenza
+      sbagliata»</em>. Ed è la stessa forma del risultato di <code>factor</code> sul crypto: la
+      finestra a 24 barre ribilanciava 173 volte l'anno e perdeva, la stessa a 2880 ne faceva 2,3 e
+      pagava. <strong>Il lordo esiste; il problema è raccoglierlo.</strong></p>
+    </div>
+    <p><strong>Ottimismo dichiarato:</strong> il libro opera alla chiusura della barra il cui close ha
+    appena letto. A tre minuti è ragionevole, ma §2 ricorda che l'esecuzione è REST verso un
+    wholesaler — lo slippage vero è la misura 10 e va sottratto da un netto già negativo.</p>
+    <p><strong>Adattamenti della rotazione a tempo di sessione:</strong> il roll avviene dentro le
+    sole righe tradabili (un roll su tutte depositerebbe posizioni su barre dove il libro deve essere
+    piatto, e il null terrebbe esposizione che la regola non può tenere), e ogni simbolo ha il proprio
+    sfasamento, perché un null che li ruotasse insieme resterebbe un libro coerente, solo in ritardo.</p>
+  </div>
+
   <h3>Il criterio di promozione, dichiarato prima di guardare qualunque output <span class="b b-ok">riusabile, rafforzato</span></h3>
   <p>Il documento precedente promuoveva sulla Rank ICIR contro l'etichetta e ha pagato quella scelta con due anni di misure su una quantità che non era il prezzo. Qui il criterio è, in ordine, e ogni riga è una condizione di sbarramento:</p>
   <ol>
@@ -634,6 +896,38 @@ footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:v
     <h4>Le due incognite che nessun backtest vede <span class="b b-open">aperto</span></h4>
     <p><strong>Il locate.</strong> La doc Alpaca dice che le vendite allo scoperto richiedono un locate approvato prima dell'ordine, in lotti tondi da 100 azioni, <em>monouso</em> — chiuso lo short, per rifarlo serve un nuovo locate. Il borrow sugli ETB è a costo zero, ma se l'obbligo di locate vale anche per gli ETB, una regola always-in che flippa ~200 volte l'anno per simbolo fa 200 chiamate di locate per simbolo, con la loro latenza e la loro possibilità di fallire. <strong>È la cosa più a rischio dell'intero progetto ed è verificabile in paper il primo giorno.</strong> Se cade, U1 resta valido ma il libro diventa long-only più un hedge di indice, che è una strategia diversa e va prezzata come tale.</p>
     <p><strong>La dispersione cross-sezionale.</strong> L'intera etichetta è un ordinamento dentro l'istante, diviso per la dispersione dell'istante. Venti ETF settoriali USA condividono un fattore di mercato molto forte, e <em>a frequenza intraday potrebbero condividerlo più di quanto facessero venti altcoin</em>. Se <code>sd_t</code> è piccola, l'etichetta è rumore diviso per un numero piccolo. È una misura da un'ora sullo store, e va fatta subito dopo la 3 — prima ancora della 5.</p>
+
+  <div class="box ok">
+    <h4>Misura 3.5 — chiusa in positivo, 2026-09-19 <span class="b b-msr">misurato</span></h4>
+    <p>Presa <em>prima</em> della 3 e non dopo: non serve lo store, bastano finestre campionate, e
+    un'ora che può invalidare l'etichetta sta davanti a quattro che la assumono. Barre 1m SIP di U1,
+    ricampionate <strong>dentro la sessione</strong> — il gap notturno non è una barra e non entra —
+    su tre regimi diversi, contro le venti coppie crypto del progetto precedente dal 2023.</p>
+    <div class="tw"><table>
+      <caption>deviazione standard cross-sezionale mediana dei rendimenti di barra</caption>
+      <thead><tr><th>set</th><th class="num">1m</th><th class="num">5m</th><th class="num">15m</th>
+      <th class="num">simboli</th></tr></thead>
+      <tbody>
+        <tr><td>U1 2018 (volatilità)</td><td class="num">0,000379</td><td class="num">0,000806</td><td class="num">0,001295</td><td class="num">18–19</td></tr>
+        <tr><td>U1 2022 (ribasso)</td><td class="num">0,000412</td><td class="num">0,000891</td><td class="num">0,001478</td><td class="num">20</td></tr>
+        <tr><td>U1 2026 (recente)</td><td class="num">0,000282</td><td class="num">0,000585</td><td class="num">0,001010</td><td class="num">19–20</td></tr>
+        <tr><td><strong>crypto 2023+</strong></td><td class="num">—</td><td class="num"><strong>0,001221</strong></td><td class="num"><strong>0,002034</strong></td><td class="num">20</td></tr>
+        <tr><td>rapporto crypto / U1</td><td class="num">—</td><td class="num">1,4× – 2,1×</td><td class="num">1,4× – 2,0×</td><td class="num"></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>L'etichetta ha materia prima.</strong> Il criterio di chiusura era «un ordine di
+    grandezza sotto il crypto»: lo scarto è un fattore fra 1,4 e 2,1, cioè lo <em>stesso</em> ordine.
+    Venti ETF americani disperdono meno di venti altcoin, e non di molto meno. Il timore che la
+    cross-section fosse degenere non si è avverato — anche perché l'universo è stato scelto su
+    questo criterio (§4, misura 1a) e non sui settori soltanto.</p>
+    <p>Due cose da portarsi dietro. <strong>Il regime recente è il più povero dei tre</strong>
+    (0,000585 a 5m contro 0,000891 nel 2022): un modello addestrato e giudicato solo sugli ultimi
+    anni affronta la versione più difficile del problema, il che è un argomento a favore dei quattro
+    fold e non contro. E la dispersione cresce circa come la <strong>radice della barra</strong>
+    (1m 0,000412 → 5m 0,000891 → 15m 0,001478, contro rapporti di radice 2,24 e 1,73): i movimenti
+    si accumulano quasi indipendentemente fra i membri del paniere, che è esattamente ciò che un
+    fattore comune dominante non farebbe.</p>
+  </div>
   </div>
 </section>
 
